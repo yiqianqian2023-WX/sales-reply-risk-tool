@@ -1,0 +1,3651 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>多平台回复风险分析工具</title>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    :root {
+      --bg: #f5f7fa;
+      --panel: #fff;
+      --ink: #1f2937;
+      --muted: #667085;
+      --line: #d9dee7;
+      --soft: #eef2f7;
+      --accent: #0f766e;
+      --accent-dark: #0b4f4a;
+      --danger: #b42318;
+      --warning: #b54708;
+      --ok: #027a48;
+      --shadow: 0 12px 32px rgba(31, 41, 55, .08);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Microsoft YaHei", "PingFang SC", Arial, sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+    }
+
+    header {
+      background: var(--panel);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .wrap {
+      width: min(1400px, calc(100vw - 32px));
+      margin: 0 auto;
+    }
+
+    .topbar {
+      min-height: 96px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 24px;
+      line-height: 1.25;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    main { padding: 22px 0 42px; }
+
+    button {
+      border: 0;
+      border-radius: 8px;
+      background: var(--accent);
+      color: #fff;
+      padding: 10px 15px;
+      min-height: 40px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button:hover { background: var(--accent-dark); }
+    button:disabled { background: #9aa7b8; cursor: not-allowed; }
+
+    .module-tabs, .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      overflow-x: auto;
+      padding: 4px;
+      background: rgba(255,255,255,.72);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      width: fit-content;
+      box-shadow: var(--shadow);
+    }
+
+    .module-tabs {
+      width: 100%;
+      margin-bottom: 14px;
+    }
+
+    .module-view { display: none; }
+    .module-view.active { display: block; }
+    .quality-platform-view { display: none; }
+    .quality-platform-view.active { display: block; }
+
+    .tab, .module-tab, .quality-tab {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--ink);
+      white-space: nowrap;
+    }
+
+    .tab.active, .module-tab.active, .quality-tab.active {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: #fff;
+      box-shadow: 0 8px 18px rgba(15, 118, 110, .22);
+    }
+
+    .upload-panel {
+      display: grid;
+      grid-template-columns: minmax(320px, 1.15fr) minmax(320px, .85fr);
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+
+    .drop, .rules, section, .metric {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    .drop {
+      border-style: dashed;
+      padding: 22px;
+      min-height: 174px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 14px;
+    }
+
+    .drop strong { font-size: 18px; }
+
+    input[type=file] {
+      max-width: 100%;
+      padding: 11px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .status {
+      min-height: 20px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .rules {
+      padding: 18px;
+    }
+
+    .rule-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .rules h2, section h2 {
+      margin: 0;
+      font-size: 18px;
+      letter-spacing: 0;
+    }
+
+    .rule-edit-btn, .rule-cancel-btn {
+      min-height: 34px;
+      padding: 7px 12px;
+      border: 1px solid #1677ff;
+      background: #fff;
+      color: #0958d9;
+    }
+
+    .rule-edit-btn:hover, .rule-cancel-btn:hover {
+      background: #e6f4ff;
+    }
+
+    .rule-save-btn {
+      min-height: 34px;
+      padding: 7px 12px;
+      background: #1677ff;
+    }
+
+    .rule-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .rule-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .rule {
+      background: var(--soft);
+      border-radius: 8px;
+      padding: 10px 12px;
+      min-height: 62px;
+    }
+
+    .rule span {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .rule b {
+      font-size: 16px;
+      line-height: 1.3;
+    }
+
+    .rule input {
+      width: 100%;
+      height: 34px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 6px 8px;
+      font: inherit;
+      font-weight: 700;
+      color: var(--ink);
+      background: #fff;
+    }
+
+    .rule em {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      font-style: normal;
+      font-size: 12px;
+    }
+
+    .rule-note {
+      margin: 12px 2px 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+      gap: 12px;
+      margin: 18px 0;
+    }
+
+    .metric {
+      padding: 14px;
+      min-height: 88px;
+      position: relative;
+      overflow: hidden;
+      transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+    }
+
+    .metric:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 16px 34px rgba(31, 41, 55, .12);
+      border-color: #b8c4d4;
+    }
+
+    .metric::before {
+      content: "";
+      position: absolute;
+      inset: 0 0 auto;
+      height: 3px;
+      background: #d0d5dd;
+    }
+
+    .metric span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+
+    .metric b {
+      display: block;
+      font-size: 24px;
+      line-height: 1.2;
+    }
+
+    .metric.good b { color: #52c41a; }
+    .metric.info b { color: #1677ff; }
+    .metric.warn b { color: #fa8c16; }
+    .metric.danger b { color: #f5222d; }
+    .metric.neutral b { color: var(--ink); }
+
+    .metric.good::before { background: #52c41a; }
+    .metric.info::before { background: #1677ff; }
+    .metric.warn::before { background: #fa8c16; }
+    .metric.danger::before { background: #f5222d; }
+    .metric.neutral::before { background: #98a2b3; }
+
+    .metric small {
+      display: block;
+      margin-top: 7px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .metric-bar {
+      height: 4px;
+      margin-top: 10px;
+      border-radius: 999px;
+      background: #edf0f5;
+      overflow: hidden;
+    }
+
+    .metric-bar i {
+      display: block;
+      height: 100%;
+      width: var(--pct, 0%);
+      border-radius: inherit;
+      background: currentColor;
+    }
+
+    .chart-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(210px, 1fr));
+      gap: 14px;
+      margin: 16px 0 18px;
+    }
+
+    .chart-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      padding: 16px;
+      min-height: 178px;
+    }
+
+    .chart-title {
+      color: var(--muted);
+      font-size: 14px;
+      text-align: center;
+      margin-bottom: 12px;
+    }
+
+    .ring {
+      --ring-color: #1677ff;
+      --ring-value: 0%;
+      width: 104px;
+      height: 104px;
+      margin: 0 auto;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: conic-gradient(var(--ring-color) var(--ring-value), #e8eaef 0);
+      position: relative;
+    }
+
+    .ring::after {
+      content: "";
+      position: absolute;
+      width: 76px;
+      height: 76px;
+      border-radius: 50%;
+      background: #fff;
+    }
+
+    .ring strong {
+      position: relative;
+      z-index: 1;
+      font-size: 22px;
+    }
+
+    .dist-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 4px;
+    }
+
+    .dist-row {
+      display: grid;
+      grid-template-columns: 72px 1fr 34px;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+    }
+
+    .dist-track {
+      height: 8px;
+      border-radius: 999px;
+      background: #edf0f5;
+      overflow: hidden;
+    }
+
+    .dist-track i {
+      display: block;
+      width: var(--pct, 0%);
+      height: 100%;
+      border-radius: inherit;
+      background: var(--bar-color, #98a2b3);
+    }
+
+    section {
+      padding: 16px;
+      margin-top: 16px;
+    }
+
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .detail-tools {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .owner-filter {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .owner-filter select {
+      min-width: 150px;
+      height: 34px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 5px 30px 5px 9px;
+      background: #fff;
+      color: var(--ink);
+      font: inherit;
+    }
+
+    .inline-filter {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .inline-filter select {
+      height: 34px;
+      min-width: 120px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 5px 30px 5px 9px;
+      background: #fff;
+      color: var(--ink);
+      font: inherit;
+    }
+
+    .filter-inline {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .filter-inline label {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .filter-inline select {
+      height: 34px;
+      min-width: 112px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 5px 30px 5px 9px;
+      background: #fff;
+      color: var(--ink);
+      font: inherit;
+    }
+
+    .th-owner-filter {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .th-owner-filter select {
+      height: 30px;
+      min-width: 128px;
+      max-width: 180px;
+      border: 1px solid #cfd6e3;
+      border-radius: 7px;
+      padding: 4px 28px 4px 8px;
+      background: #fff;
+      color: var(--ink);
+      font: inherit;
+      font-weight: 400;
+    }
+
+    .table-wrap {
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      max-height: 520px;
+    }
+
+    table {
+      border-collapse: collapse;
+      min-width: 100%;
+      font-size: 13px;
+      background: #fff;
+    }
+
+    th, td {
+      border-bottom: 1px solid var(--line);
+      padding: 9px 10px;
+      text-align: left;
+      white-space: nowrap;
+      max-width: 280px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    td.risk-tag-cell {
+      white-space: normal;
+      max-width: 520px;
+      min-width: 260px;
+      overflow: visible;
+      text-overflow: clip;
+      line-height: 1.9;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: #eef2f7;
+      font-weight: 700;
+    }
+
+    tr:hover td { background: #f8fafc; }
+
+    tbody tr.row-danger td:first-child { box-shadow: inset 4px 0 0 #f5222d; }
+    tbody tr.row-warn td:first-child { box-shadow: inset 4px 0 0 #fa8c16; }
+    tbody tr.row-info td:first-child { box-shadow: inset 4px 0 0 #1677ff; }
+    tbody tr.row-danger:hover td { background: #fff8f7; }
+    tbody tr.row-warn:hover td { background: #fffaf0; }
+
+    .badge {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 3px 9px;
+      font-weight: 700;
+      font-size: 12px;
+      border: 1px solid transparent;
+    }
+
+    .high { color: var(--danger); background: #fff1f0; border-color: #fecdca; }
+    .mid { color: var(--warning); background: #fff7e6; border-color: #fedf89; }
+    .low { color: var(--ok); background: #ecfdf3; border-color: #abefc6; }
+
+    .tag {
+      display: inline-block;
+      border-radius: 5px;
+      padding: 2px 7px;
+      margin: 1px 4px 1px 0;
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1.5;
+      border: 1px solid transparent;
+    }
+
+    .tag-blue { color: #0958d9; background: #e6f4ff; border-color: #bae0ff; }
+    .tag-orange { color: #d46b08; background: #fff7e6; border-color: #ffd591; }
+    .tag-yellow { color: #ad6800; background: #fffbe6; border-color: #ffe58f; }
+    .tag-red { color: #cf1322; background: #fff1f0; border-color: #ffa39e; }
+    .tag-purple { color: #531dab; background: #f9f0ff; border-color: #d3adf7; }
+    .tag-green { color: #237804; background: #f6ffed; border-color: #b7eb8f; }
+
+    .tag-gray { color: #475467; background: #f2f4f7; border-color: #d0d5dd; }
+
+    .score-select, .review-note-input {
+      height: 32px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: #fff;
+      color: var(--ink);
+      font: inherit;
+      padding: 4px 8px;
+    }
+
+    .score-select { min-width: 112px; }
+
+    .review-note-input {
+      min-width: 180px;
+      max-width: 260px;
+    }
+
+    .text-preview {
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      white-space: normal;
+      overflow: hidden;
+      max-width: 360px;
+      max-height: 58px;
+      line-height: 1.45;
+    }
+
+    .mic-note-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 128px;
+    }
+
+    .mic-note-actions .muted {
+      color: var(--muted);
+    }
+
+    .detail-btn {
+      min-height: 30px;
+      padding: 5px 10px;
+      border: 1px solid #1677ff;
+      background: #fff;
+      color: #0958d9;
+    }
+
+    .detail-btn:hover { background: #e6f4ff; }
+
+    .detail-row td {
+      background: #fbfcfd;
+      white-space: normal;
+      max-width: none;
+    }
+
+    .detail-card {
+      display: grid;
+      gap: 10px;
+      padding: 12px;
+      color: var(--ink);
+    }
+
+    .detail-card b {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .detail-card p {
+      margin: 0;
+      line-height: 1.6;
+    }
+
+    .yn {
+      font-weight: 700;
+    }
+
+    .yn.y { color: #237804; }
+    .yn.n { color: #cf1322; }
+
+    .num-warn { color: #fa8c16; font-weight: 700; }
+    .num-danger { color: #f5222d; font-weight: 700; }
+
+    .empty {
+      color: var(--muted);
+      padding: 24px;
+      text-align: center;
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+      background: #fbfcfd;
+    }
+
+    @media (max-width: 980px) {
+      .topbar, .upload-panel { display: grid; grid-template-columns: 1fr; }
+      .chart-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 560px) {
+      .wrap { width: min(100vw - 20px, 1400px); }
+      .rule-grid { grid-template-columns: 1fr; }
+      .chart-grid { grid-template-columns: 1fr; }
+      h1 { font-size: 21px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap topbar">
+      <div>
+        <h1>业务员回复风险评估</h1>
+        <div class="subtitle">回复时间风险用于判断响应是否及时，回复质量风险用于筛选需要人工复核的高价值商机。</div>
+      </div>
+      <button id="exportBtn" disabled>导出分析结果 Excel</button>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="module-tabs" aria-label="模型模块">
+      <button class="module-tab active" data-module="time">回复时间风险</button>
+      <button class="module-tab" data-module="quality">回复质量风险</button>
+      <button class="module-tab" data-module="review">人工复核与最终评估</button>
+    </div>
+
+    <div id="timeView" class="module-view active">
+      <div class="tabs" aria-label="平台选择">
+        <button class="tab active" data-platform="ali">阿里国际站</button>
+        <button class="tab" data-platform="mic">中国制造网</button>
+      </div>
+
+      <div class="upload-panel">
+        <div class="drop">
+          <strong id="uploadTitle">选择阿里国际站后台原始回复明细表</strong>
+          <input id="fileInput" type="file" accept=".xls,.xlsx,.csv">
+          <div class="actions">
+            <button id="clearBtn" disabled>清空结果</button>
+            <span id="status" class="status">等待上传文件</span>
+          </div>
+        </div>
+        <div class="rules">
+          <div class="rule-head">
+            <h2 id="ruleTitle">阿里国际站模板规则</h2>
+            <div class="rule-actions" id="ruleActions">
+              <button id="editRuleBtn" class="rule-edit-btn" type="button">修改规则</button>
+            </div>
+          </div>
+          <div id="ruleGrid" class="rule-grid"></div>
+          <div class="rule-note">本工具用于筛选回复风险记录，最终接待权限调整需结合异常聊天内容抽查确认。</div>
+        </div>
+      </div>
+
+      <div id="metrics" class="metrics"></div>
+      <div id="charts" class="chart-grid"></div>
+
+      <section>
+        <div class="section-head">
+          <h2>业务员接待风险汇总</h2>
+          <div id="summaryHint" class="hint">暂无数据</div>
+        </div>
+        <div id="summaryTable" class="empty">上传文件后显示汇总结果</div>
+      </section>
+
+      <section>
+        <div class="section-head">
+          <h2>异常明细</h2>
+          <div class="detail-tools">
+            <div id="detailHint" class="hint">只显示有风险标签的记录</div>
+          </div>
+        </div>
+        <div id="detailTable" class="empty">上传文件后显示异常记录</div>
+      </section>
+    </div>
+
+    <div id="qualityView" class="module-view">
+      <div class="tabs" aria-label="回复质量平台选择">
+        <button class="quality-tab active" data-quality-platform="ali">阿里国际站</button>
+        <button class="quality-tab" data-quality-platform="mic">中国制造网</button>
+      </div>
+
+      <div id="aliQualityPanel" class="quality-platform-view active">
+      <div class="upload-panel">
+        <div class="drop">
+          <strong>选择阿里国际站询盘中心报表</strong>
+          <input id="qualityFileInput" type="file" accept=".xls,.xlsx,.csv">
+          <div class="actions">
+            <button id="qualityClearBtn" disabled>清空结果</button>
+            <span id="qualityStatus" class="status">等待上传询盘中心报表</span>
+          </div>
+        </div>
+        <div class="rules">
+          <div class="rule-head">
+            <h2>回复质量筛选规则</h2>
+          </div>
+          <div class="rule-grid">
+            <div class="rule"><span>P0 必须复核</span><b>重点国家 + L2/L3/L4 买家</b></div>
+            <div class="rule"><span>P1 优先复核</span><b>仅 L1 及以上客户，L0 不进入 P1</b></div>
+            <div class="rule"><span>P2 抽查池</span><b>保留明细，可抽查，不计入待复核量</b></div>
+            <div class="rule"><span>P3 观察池</span><b>暂不重点，不计入待复核量</b></div>
+          </div>
+          <div class="rule-note">本工具用于辅助筛选需要人工复核的商机，最终回复质量判断需结合聊天记录证据确认。</div>
+        </div>
+      </div>
+
+      <div id="qualityMetrics" class="metrics"></div>
+      <div id="qualityCharts" class="chart-grid"></div>
+
+      <section>
+        <div class="section-head">
+          <h2>业务员复核优先级汇总</h2>
+          <div id="qualitySummaryHint" class="hint">暂无数据</div>
+        </div>
+        <div id="qualitySummaryTable" class="empty">上传文件后显示汇总结果</div>
+      </section>
+
+      <section>
+        <div class="section-head">
+          <h2>复核商机明细</h2>
+          <div class="detail-tools">
+            <label class="inline-filter">优先级
+              <select id="priorityFilter">
+                <option value="">全部</option>
+                <option value="P0">P0</option>
+                <option value="P1">P1</option>
+                <option value="P2">P2</option>
+                <option value="P3">P3</option>
+              </select>
+            </label>
+            <div id="qualityDetailHint" class="hint">默认显示全部优先级</div>
+          </div>
+        </div>
+        <div id="qualityDetailTable" class="empty">上传文件后显示复核清单</div>
+      </section>
+      </div>
+
+      <div id="micQualityPanel" class="quality-platform-view">
+      <div class="upload-panel">
+        <div class="drop">
+          <strong>选择中国制造网 Inbox / Sent 原始数据</strong>
+          <input id="micQualityFileInput" type="file" accept=".xls,.xlsx,.csv">
+          <div class="actions">
+            <button id="micQualityClearBtn" disabled>清空结果</button>
+            <span id="micQualityStatus" class="status">等待上传中国制造网原始数据</span>
+          </div>
+        </div>
+        <div class="rules">
+          <div class="rule-head">
+            <h2>中国制造网回复质量筛选规则</h2>
+          </div>
+          <div class="rule-grid">
+            <div class="rule"><span>P0 必须复核</span><b>重点国家强需求，或未回复/占坑高风险</b></div>
+            <div class="rule"><span>P1 优先复核</span><b>重点弱需求、非重点强需求多信号、占坑回复</b></div>
+            <div class="rule"><span>P2 抽查复核</span><b>非重点弱需求、重复模板、未回复模板</b></div>
+            <div class="rule"><span>P3 暂不重点</span><b>信息不完整或无明确商业意图</b></div>
+          </div>
+          <div class="rule-note">第一步仅生成中国制造网复核任务列表，不进入最终风险分，也不改回复时间模型。</div>
+        </div>
+      </div>
+
+      <div id="micQualityMetrics" class="metrics"></div>
+
+      <section>
+        <div class="section-head">
+          <h2>业务员复核优先级汇总</h2>
+          <div id="micQualityOwnerSummaryHint" class="hint">暂无数据</div>
+        </div>
+        <div id="micQualityOwnerSummaryTable" class="empty">上传文件后显示业务员优先级汇总</div>
+      </section>
+
+      <section>
+        <div class="section-head">
+          <h2>中国制造网复核任务列表</h2>
+          <div class="detail-tools">
+            <label class="inline-filter">优先级
+              <select id="micPriorityFilter">
+                <option value="review">待复核 P0+P1</option>
+                <option value="">全部</option>
+                <option value="P0">P0</option>
+                <option value="P1">P1</option>
+                <option value="P2">P2</option>
+                <option value="P3">P3</option>
+              </select>
+            </label>
+            <div id="micQualityDetailHint" class="hint">默认显示 P0+P1 待复核任务</div>
+          </div>
+        </div>
+        <div id="micQualityTable" class="empty">上传文件后显示中国制造网复核任务</div>
+      </section>
+      </div>
+    </div>
+
+    <div id="reviewView" class="module-view">
+      <div class="upload-panel">
+        <div class="drop">
+          <strong>人工复核与最终评估</strong>
+          <div class="subtitle">在“回复质量风险”里给商机打分后，这里会按业务员汇总复核样本、平均风险分、问题率和严重问题率。</div>
+          <div class="actions">
+            <span id="reviewStatus" class="status">等待回复质量复核数据</span>
+          </div>
+        </div>
+        <div class="rules">
+          <div class="rule-head">
+            <h2>样本不足判断口径</h2>
+          </div>
+          <div class="rule-grid">
+            <div class="rule"><span>0 个复核样本</span><b>无复核样本，本周期不评价</b></div>
+            <div class="rule"><span>1-4 个复核样本</span><b>样本不足，仅观察</b></div>
+            <div class="rule"><span>5 个及以上</span><b>进入低/中/高/严重风险评级</b></div>
+            <div class="rule"><span>计算方式</span><b>看平均风险分、问题率、严重问题率</b></div>
+          </div>
+          <div class="rule-note">最终风险分仅作为管理参考，是否调整询盘接待权限需结合聊天记录证据和连续周期表现综合判断。</div>
+        </div>
+      </div>
+
+      <div id="reviewMetrics" class="metrics"></div>
+      <section>
+        <div class="section-head">
+          <h2>业务员回复质量复核汇总</h2>
+          <div id="reviewSummaryHint" class="hint">暂无数据</div>
+        </div>
+        <div id="reviewSummaryTable" class="empty">完成复核打分后显示汇总结果</div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const PLATFORM_CONFIG = {
+      ali: {
+        name: "阿里国际站",
+        uploadTitle: "选择阿里国际站后台原始回复明细表",
+        exportName: "阿里国际站回复风险分析结果.xlsx",
+        rules: [
+          ["工作时间", "08:00 - 18:00"],
+          ["PST 转北京时间", "+16 小时"],
+          ["超 1 小时", "回复时长 >= 1"],
+          ["严重延迟", "回复时长 >= 6"]
+        ],
+        settings: { workStart: 8, workEnd: 18, overOne: 1, severe: 6, offsetHours: 16 },
+        ruleControls: [
+          { key: "workStart", label: "工作开始小时", unit: "点", min: 0, max: 23, step: 1 },
+          { key: "workEnd", label: "工作结束小时", unit: "点", min: 1, max: 24, step: 1 },
+          { key: "offsetHours", label: "PST转北京时间", unit: "小时", min: -24, max: 24, step: 1 },
+          { key: "overOne", label: "超1小时阈值", unit: "小时", min: 0, max: 72, step: 0.5 },
+          { key: "severe", label: "严重延迟阈值", unit: "小时", min: 0, max: 168, step: 0.5 }
+        ],
+        headerKeys: ["及时回复负责人", "发送时间（PST）", "回复时间（PST）", "回复时长（小时）", "是否极速回复（5分钟）"],
+        rawHeaders: [
+          "序号", "客户/商机标识", "发送时间PST", "回复时间PST", "回复时长小时",
+          "是否极速回复5分钟", "是否人工极速回复", "及时回复负责人", "北京发送时间",
+          "星期", "咨询时段", "非工作咨询", "极速回复标记", "人工极速标记",
+          "非工作未极速", "极速但非人工", "超1小时", "严重延迟", "风险分", "风险标签"
+        ],
+        summaryHeaders: [
+          "业务员", "总咨询数", "极速回复数", "极速回复率", "人工极速数", "人工极速率",
+          "非工作咨询数", "非工作未极速数", "非工作未极速率", "极速但非人工数",
+          "超1小时数", "严重延迟数", "风险分", "风险等级"
+        ],
+        detailHeaders: [
+          "序号", "客户/商机标识", "北京发送时间", "回复时间北京时间", "回复时长小时",
+          "是否极速", "是否人工极速", "负责人", "风险标签", "单条风险分"
+        ]
+      },
+      mic: {
+        name: "中国制造网",
+        uploadTitle: "选择中国制造网账户回复明细表",
+        exportName: "中国制造网回复风险分析结果.xlsx",
+        rules: [
+          ["工作时间", "09:00 - 18:00"],
+          ["极速回复", "回复时长 <= 4 小时"],
+          ["及时回复", "回复时长 <= 24 小时"],
+          ["严重延迟", "回复时长 >= 24 小时"]
+        ],
+        settings: {
+          workStart: 9,
+          workEnd: 18,
+          overOne: 1,
+          fastHours: 4,
+          timelyHours: 24,
+          severe: 24,
+          highNonWorkUnfastRate: 0.6,
+          midNonWorkUnfastRate: 0.35,
+          highOverFastRate: 0.4,
+          midOverFastRate: 0.2,
+          midFastRateFloor: 0.7,
+          highFastRateFloor: 0.5
+        },
+        ruleControls: [
+          { key: "workStart", label: "工作开始小时", unit: "点", min: 0, max: 23, step: 1 },
+          { key: "workEnd", label: "工作结束小时", unit: "点", min: 1, max: 24, step: 1 },
+          { key: "fastHours", label: "极速回复阈值", unit: "小时", min: 0, max: 72, step: 0.5 },
+          { key: "timelyHours", label: "及时回复阈值", unit: "小时", min: 0, max: 168, step: 0.5 },
+          { key: "overOne", label: "超1小时阈值", unit: "小时", min: 0, max: 72, step: 0.5 },
+          { key: "severe", label: "严重延迟阈值", unit: "小时", min: 0, max: 168, step: 0.5 }
+        ],
+        sheetNames: ["账户回复明细", "回复明细"],
+        headerKeys: ["来源", "发送方ID", "发送方名字", "发送方首次发送时间", "及时回复负责人", "首次回复时间"],
+        rawHeaders: [
+          "来源", "发送方ID", "发送方名字", "发送方首次发送时间", "及时回复负责人",
+          "回复账户", "首次回复时间", "是否及时回复（24小时）", "管理员分配时间",
+          "发送时间标准化", "回复时长小时", "是否4小时极速", "是否24小时及时",
+          "咨询时段", "非工作咨询", "非工作未极速", "超1小时",
+          "超4小时未极速", "超24小时未及时", "风险标签", "单条风险分"
+        ],
+        summaryHeaders: [
+          "业务员", "总咨询数", "4小时极速数", "4小时极速率", "24小时及时数", "24小时及时率",
+          "非工作咨询数", "非工作未极速数", "非工作未极速率", "超1小时数",
+          "超4小时未极速数", "超24小时未及时数", "风险分", "风险等级", "建议动作"
+        ],
+        detailHeaders: [
+          "序号", "来源", "发送方ID", "发送方名字", "发送时间", "首次回复时间",
+          "回复时长小时", "是否4小时极速", "是否24小时及时", "负责人", "风险标签"
+        ]
+      }
+    };
+
+    const QUALITY_CONFIG = {
+      name: "回复质量风险",
+      exportName: "回复质量风险分析结果.xlsx",
+      priorityCountries: ["美国", "德国", "法国", "意大利", "英国", "墨西哥", "阿根廷", "巴西", "俄罗斯", "加拿大", "澳大利亚", "西班牙", "沙特阿拉伯"],
+      highBuyerLevels: ["L2", "L3", "L4"],
+      headerKeys: ["序号", "创建时间", "业务", "询盘单号", "客户等级", "客户名", "国家"],
+      summaryHeaders: ["业务员", "总询盘数", "P0必须复核", "P1优先复核", "P2抽查复核", "P3暂不重点", "待复核数", "待复核占比"],
+      detailHeaders: ["优先级", "业务员", "询盘单号", "客户名", "国家", "客户等级", "跟进状态", "复核原因", "人工复核结果", "单条风险分", "人工备注"],
+      rawHeaders: [
+        "序号", "创建时间", "更新时间", "业务员", "询盘单号", "商机来源", "商机分类", "询盘端口",
+        "高意向", "客户等级", "客户ID", "客户名", "邮箱", "国家", "客户公司名称", "注册时间",
+        "买家标签", "买家特征", "跟进状态", "近90天登录天数", "近90天产品浏览数",
+        "近90天有效询盘", "近90天有效RFQ数", "信保订单数", "信保总金额($)",
+        "复核优先级", "复核原因", "人工评分", "复核备注"
+      ],
+      reviewHeaders: [
+        "业务员", "复核商机数", "P0/P1/P2/P3结构", "平均人工风险分",
+        "人工复核加权风险分", "时间风险标准分", "最终风险分", "最终风险等级",
+        "风险提示 / 处理建议", "问题率", "严重问题率", "严重问题数"
+      ],
+      reviewExportHeaders: [
+        "业务员", "复核商机数", "P0/P1/P2/P3结构", "总人工风险分", "平均人工风险分",
+        "人工复核加权风险分", "时间风险标准分", "最终风险分", "最终风险等级",
+        "风险提示 / 处理建议", "问题率", "严重问题率", "严重问题数"
+      ]
+    };
+
+    const IMPORTANT_CUSTOMER_RISK_WEIGHTS = { P0: 1.5, P1: 1.2, P2: 1, P3: 0.8 };
+
+    const MIC_QUALITY_CONFIG = {
+      exportName: "中国制造网回复质量复核任务.xlsx",
+      priorityCountries: ["United States", "Germany", "France", "Italy", "United Kingdom", "Mexico", "Argentina", "Brazil", "Russia", "Canada", "Australia", "Spain", "Saudi Arabia"],
+      expectedCountsByTotal: {
+        81: { P0: 5, P1: 15, P2: 55, P3: 6 }
+      },
+      detailHeaders: [
+        "平台", "复核优先级", "业务员", "客户名", "国家", "复核原因", "客户原始需求",
+        "业务员回复内容", "人工复核结果", "单条风险分", "人工备注"
+      ]
+    };
+
+    const OWNER_ALIASES = {
+      "colin": "Colin Jiang",
+      "colinjiang": "Colin Jiang",
+      "matthew": "Matthew Chen",
+      "matthewchen": "Matthew Chen",
+      "mya": "Mya Xu",
+      "myaxu": "Mya Xu",
+      "sharon": "Sharon Sui",
+      "sharonsui": "Sharon Sui",
+      "sia": "Sia Lee",
+      "sialee": "Sia Lee",
+      "levi": "Levi Meng",
+      "levimeng": "Levi Meng",
+      "tony": "Tony Wang",
+      "tonywang": "Tony Wang",
+      "hedy": "Hedy Wang",
+      "hedywang": "Hedy Wang"
+    };
+
+    let activeModule = "time";
+    let activePlatform = "ali";
+    let activeQualityPlatform = "ali";
+    let current = null;
+    const platformState = { ali: null, mic: null };
+    const ownerFilterState = { ali: "", mic: "" };
+    const qualityState = { current: null, priorityFilter: "", scores: loadQualityScores() };
+    const micQualityState = { current: null, priorityFilter: "review", openDetail: "" };
+    let ruleEditorOpen = false;
+    const DEFAULT_SETTINGS = JSON.parse(JSON.stringify({
+      ali: PLATFORM_CONFIG.ali.settings,
+      mic: PLATFORM_CONFIG.mic.settings
+    }));
+    loadSavedSettings();
+
+    const moduleTabs = document.querySelectorAll(".module-tab");
+    const moduleViews = document.querySelectorAll(".module-view");
+    const tabs = document.querySelectorAll(".tab");
+    const qualityTabs = document.querySelectorAll(".quality-tab");
+    const qualityPlatformViews = document.querySelectorAll(".quality-platform-view");
+    const fileInput = document.getElementById("fileInput");
+    const exportBtn = document.getElementById("exportBtn");
+    const clearBtn = document.getElementById("clearBtn");
+    const statusEl = document.getElementById("status");
+    const metricsEl = document.getElementById("metrics");
+    const chartsEl = document.getElementById("charts");
+    const summaryEl = document.getElementById("summaryTable");
+    const detailEl = document.getElementById("detailTable");
+    const summaryHint = document.getElementById("summaryHint");
+    const detailHint = document.getElementById("detailHint");
+    const uploadTitle = document.getElementById("uploadTitle");
+    const ruleTitle = document.getElementById("ruleTitle");
+    const ruleGrid = document.getElementById("ruleGrid");
+    const ruleActions = document.getElementById("ruleActions");
+    const editRuleBtn = document.getElementById("editRuleBtn");
+    const qualityFileInput = document.getElementById("qualityFileInput");
+    const qualityClearBtn = document.getElementById("qualityClearBtn");
+    const qualityStatusEl = document.getElementById("qualityStatus");
+    const qualityMetricsEl = document.getElementById("qualityMetrics");
+    const qualityChartsEl = document.getElementById("qualityCharts");
+    const qualitySummaryEl = document.getElementById("qualitySummaryTable");
+    const qualityDetailEl = document.getElementById("qualityDetailTable");
+    const qualitySummaryHint = document.getElementById("qualitySummaryHint");
+    const qualityDetailHint = document.getElementById("qualityDetailHint");
+    const priorityFilter = document.getElementById("priorityFilter");
+    const reviewStatusEl = document.getElementById("reviewStatus");
+    const reviewMetricsEl = document.getElementById("reviewMetrics");
+    const reviewSummaryEl = document.getElementById("reviewSummaryTable");
+    const reviewSummaryHint = document.getElementById("reviewSummaryHint");
+    const micQualityFileInput = document.getElementById("micQualityFileInput");
+    const micQualityClearBtn = document.getElementById("micQualityClearBtn");
+    const micQualityStatusEl = document.getElementById("micQualityStatus");
+    const micQualityMetricsEl = document.getElementById("micQualityMetrics");
+    const micPriorityFilter = document.getElementById("micPriorityFilter");
+    const micQualityOwnerSummaryHint = document.getElementById("micQualityOwnerSummaryHint");
+    const micQualityOwnerSummaryTable = document.getElementById("micQualityOwnerSummaryTable");
+    const micQualityDetailHint = document.getElementById("micQualityDetailHint");
+    const micQualityTable = document.getElementById("micQualityTable");
+
+    moduleTabs.forEach(tab => tab.addEventListener("click", () => switchModule(tab.dataset.module)));
+    tabs.forEach(tab => tab.addEventListener("click", () => switchPlatform(tab.dataset.platform)));
+    qualityTabs.forEach(tab => tab.addEventListener("click", () => switchQualityPlatform(tab.dataset.qualityPlatform)));
+    fileInput.addEventListener("change", handleFile);
+    exportBtn.addEventListener("click", exportWorkbook);
+    clearBtn.addEventListener("click", resetPage);
+    qualityFileInput.addEventListener("change", handleQualityFile);
+    qualityClearBtn.addEventListener("click", resetQualityPage);
+    priorityFilter.addEventListener("change", () => {
+      qualityState.priorityFilter = priorityFilter.value;
+      renderQualityDetails();
+    });
+    micQualityFileInput.addEventListener("change", handleMicQualityFile);
+    micQualityClearBtn.addEventListener("click", resetMicQualityPage);
+    micPriorityFilter.addEventListener("change", () => {
+      micQualityState.priorityFilter = micPriorityFilter.value;
+      renderMicQualityDetails();
+    });
+    editRuleBtn.addEventListener("click", () => {
+      ruleEditorOpen = true;
+      renderPlatformChrome();
+    });
+
+    renderPlatformChrome();
+
+    function switchModule(module) {
+      if (module === activeModule) return;
+      activeModule = module;
+      moduleTabs.forEach(tab => tab.classList.toggle("active", tab.dataset.module === module));
+      moduleViews.forEach(view => view.classList.toggle("active", view.id === `${module}View`));
+      if (module === "time") {
+        current = platformState[activePlatform];
+        renderPlatformChrome();
+        renderCachedState();
+      } else if (module === "quality") {
+        renderQualityCachedState();
+      } else {
+        renderReviewModule();
+      }
+      updateExportButton();
+    }
+
+    function refreshFinalReviewSummary() {
+      renderReviewModule();
+    }
+
+    function switchQualityPlatform(platform) {
+      if (platform === activeQualityPlatform) return;
+      activeQualityPlatform = platform;
+      qualityTabs.forEach(tab => tab.classList.toggle("active", tab.dataset.qualityPlatform === platform));
+      qualityPlatformViews.forEach(view => view.classList.toggle("active", view.id === `${platform}QualityPanel`));
+      if (platform === "ali") {
+        renderQualityCachedState();
+      } else {
+        renderMicQualityCachedState();
+      }
+    }
+
+    function updateExportButton() {
+      if (activeModule === "time") {
+        exportBtn.disabled = !current;
+        exportBtn.textContent = "导出分析结果 Excel";
+      } else if (activeModule === "quality") {
+        exportBtn.disabled = !qualityState.current;
+        exportBtn.textContent = "导出回复质量 Excel";
+      } else {
+        exportBtn.disabled = !qualityState.current && !micQualityState.current;
+        exportBtn.textContent = "导出复核汇总 Excel";
+      }
+    }
+
+    function switchPlatform(platform) {
+      if (platform === activePlatform) return;
+      activePlatform = platform;
+      current = platformState[platform];
+      ruleEditorOpen = false;
+      tabs.forEach(tab => tab.classList.toggle("active", tab.dataset.platform === platform));
+      fileInput.value = "";
+      renderPlatformChrome();
+      renderCachedState();
+      updateExportButton();
+    }
+
+    function renderPlatformChrome() {
+      const cfg = PLATFORM_CONFIG[activePlatform];
+      uploadTitle.textContent = cfg.uploadTitle;
+      ruleTitle.textContent = `${cfg.name}模板规则`;
+      if (ruleEditorOpen) {
+        ruleActions.innerHTML = `
+          <button id="saveRuleBtn" class="rule-save-btn" type="button">保存规则</button>
+          <button id="cancelRuleBtn" class="rule-cancel-btn" type="button">取消</button>
+          <button id="resetRuleBtn" class="rule-cancel-btn" type="button">恢复模板</button>
+        `;
+        ruleGrid.innerHTML = cfg.ruleControls.map(rule => `
+          <label class="rule">
+            <span>${escapeHtml(rule.label)}</span>
+            <input data-rule-key="${escapeHtml(rule.key)}" type="number" min="${rule.min}" max="${rule.max}" step="${rule.step}" value="${cfg.settings[rule.key]}">
+            <em>${escapeHtml(rule.unit)}</em>
+          </label>
+        `).join("");
+        document.getElementById("saveRuleBtn").addEventListener("click", saveRules);
+        document.getElementById("cancelRuleBtn").addEventListener("click", () => {
+          ruleEditorOpen = false;
+          renderPlatformChrome();
+        });
+        document.getElementById("resetRuleBtn").addEventListener("click", resetRulesToTemplate);
+      } else {
+        ruleActions.innerHTML = `<button id="editRuleBtn" class="rule-edit-btn" type="button">修改规则</button>`;
+        ruleActions.querySelector("#editRuleBtn").addEventListener("click", () => {
+          ruleEditorOpen = true;
+          renderPlatformChrome();
+        });
+        ruleGrid.innerHTML = getRuleItems(activePlatform).map(([label, value]) => `
+          <div class="rule"><span>${escapeHtml(label)}</span><b>${escapeHtml(value)}</b></div>
+        `).join("");
+      }
+    }
+
+    function getRuleItems(platform) {
+      const cfg = PLATFORM_CONFIG[platform];
+      const s = cfg.settings;
+      if (platform === "mic") {
+        return [
+          ["工作时间", `${s.workStart}:00 - ${s.workEnd}:00`],
+          ["极速回复", `回复时长 <= ${s.fastHours} 小时`],
+          ["及时回复", `回复时长 <= ${s.timelyHours} 小时`],
+          ["严重延迟", `回复时长 >= ${s.severe} 小时`]
+        ];
+      }
+      return [
+        ["工作时间", `${String(s.workStart).padStart(2, "0")}:00 - ${String(s.workEnd).padStart(2, "0")}:00`],
+        ["PST 转北京时间", `${s.offsetHours >= 0 ? "+" : ""}${s.offsetHours} 小时`],
+        ["超1小时", `回复时长 >= ${s.overOne}`],
+        ["严重延迟", `回复时长 >= ${s.severe}`]
+      ];
+    }
+
+    function saveRules() {
+      const cfg = PLATFORM_CONFIG[activePlatform];
+      const next = { ...cfg.settings };
+      ruleGrid.querySelectorAll("input[data-rule-key]").forEach(input => {
+        const key = input.dataset.ruleKey;
+        const value = Number(input.value);
+        if (Number.isFinite(value)) next[key] = value;
+      });
+      if (next.workEnd <= next.workStart) {
+        setStatus("工作结束小时必须大于工作开始小时。", true);
+        return;
+      }
+      Object.assign(cfg.settings, next);
+      saveSettingsToLocal();
+      ruleEditorOpen = false;
+      renderPlatformChrome();
+      recalculateCurrent("规则已更新，并已重新计算当前结果。");
+    }
+
+    function resetRulesToTemplate() {
+      Object.assign(PLATFORM_CONFIG[activePlatform].settings, DEFAULT_SETTINGS[activePlatform]);
+      saveSettingsToLocal();
+      ruleEditorOpen = false;
+      renderPlatformChrome();
+      recalculateCurrent("已恢复模板规则，并已重新计算当前结果。");
+    }
+
+    function saveSettingsToLocal() {
+      try {
+        localStorage.setItem("replyRiskSettings", JSON.stringify({
+          ali: PLATFORM_CONFIG.ali.settings,
+          mic: PLATFORM_CONFIG.mic.settings
+        }));
+      } catch (error) {
+        console.warn("无法保存规则设置", error);
+      }
+    }
+
+    function loadSavedSettings() {
+      try {
+        const saved = JSON.parse(localStorage.getItem("replyRiskSettings") || "{}");
+        if (saved.ali) Object.assign(PLATFORM_CONFIG.ali.settings, saved.ali);
+        if (saved.mic) Object.assign(PLATFORM_CONFIG.mic.settings, saved.mic);
+      } catch (error) {
+        console.warn("无法读取规则设置", error);
+      }
+    }
+
+    function recalculateCurrent(message) {
+      if (!current || current.platform !== activePlatform || !current.sourceHeaders || !current.sourceRows) {
+        setStatus(message || "规则已更新。");
+        return;
+      }
+      const next = analyze(current.sourceHeaders, current.sourceRows, activePlatform);
+      current = {
+        ...current,
+        ...next,
+        sourceHeaders: current.sourceHeaders,
+        sourceRows: current.sourceRows
+      };
+      platformState[activePlatform] = current;
+      renderAll();
+      refreshFinalReviewSummary();
+      setStatus(message || `已重新计算：${current.records.length} 条记录，${current.abnormal.length} 条异常`);
+    }
+
+    function normalizeHeader(value) {
+      return String(value ?? "")
+        .replace(/\s+/g, "")
+        .replace(/[()]/g, m => m === "(" ? "（" : "）")
+        .replace(/：/g, ":")
+        .trim();
+    }
+
+    function yesFlag(value) {
+      const text = String(value ?? "").trim().toUpperCase();
+      return text === "Y" || text === "是" || text === "1" || value === 1 || value === true ? 1 : 0;
+    }
+
+    function toNumber(value) {
+      if (typeof value === "number" && Number.isFinite(value)) return value;
+      const text = String(value ?? "").replace(/,/g, "").trim();
+      const num = Number(text);
+      return Number.isFinite(num) ? num : 0;
+    }
+
+    function excelSerialToDate(serial) {
+      const whole = Math.floor(serial);
+      const fraction = serial - whole;
+      const base = new Date(1899, 11, 30);
+      return new Date(base.getTime() + whole * 86400000 + Math.round(fraction * 86400000));
+    }
+
+    function parseDateLike(value) {
+      if (value instanceof Date) return new Date(value.getTime());
+      if (typeof value === "number" && Number.isFinite(value)) return excelSerialToDate(value);
+      const text = String(value ?? "").trim();
+      if (!text || text === "-") return null;
+      const match = text.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
+      if (match) {
+        return new Date(
+          Number(match[1]),
+          Number(match[2]) - 1,
+          Number(match[3]),
+          Number(match[4] || 0),
+          Number(match[5] || 0),
+          Number(match[6] || 0)
+        );
+      }
+      const parsed = new Date(text);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+
+    function addHours(date, hours) {
+      return date ? new Date(date.getTime() + hours * 3600000) : null;
+    }
+
+    function hoursBetween(start, end) {
+      if (!start || !end) return "";
+      return Math.max(0, (end.getTime() - start.getTime()) / 3600000);
+    }
+
+    function pad(n) {
+      return String(n).padStart(2, "0");
+    }
+
+    function formatDateTime(date) {
+      if (!date) return "";
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+    }
+
+    function weekdayExcel(date) {
+      const jsDay = date.getDay();
+      return jsDay === 0 ? 7 : jsDay;
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function percent(value) {
+      return `${Math.round((value || 0) * 1000) / 10}%`;
+    }
+
+    function roundedHours(value) {
+      return value === "" ? "" : Math.round(value * 100) / 100;
+    }
+
+    function safeDivide(n, d) {
+      return d ? n / d : 0;
+    }
+
+    function findHeaderRow(rows, cfg) {
+      let best = { index: -1, score: 0 };
+      rows.forEach((row, index) => {
+        const text = row.map(normalizeHeader).join("|");
+        let score = 0;
+        cfg.headerKeys.forEach(key => {
+          if (text.includes(normalizeHeader(key))) score += 1;
+        });
+        if (score > best.score) best = { index, score };
+      });
+      return best.score >= Math.min(3, cfg.headerKeys.length) ? best.index : 0;
+    }
+
+    function indexByCandidates(headers, candidates, fallback = -1) {
+      const normalized = headers.map(normalizeHeader);
+      for (const candidate of candidates) {
+        const key = normalizeHeader(candidate);
+        const exact = normalized.indexOf(key);
+        if (exact >= 0) return exact;
+      }
+      for (const candidate of candidates) {
+        const key = normalizeHeader(candidate);
+        const fuzzy = normalized.findIndex(h => h.includes(key) || key.includes(h));
+        if (fuzzy >= 0) return fuzzy;
+      }
+      return fallback;
+    }
+
+    function pickSourceSheetName(workbook, cfg) {
+      const preferred = cfg.sheetNames || [];
+      const matched = preferred.find(name => workbook.SheetNames.some(sheetName => normalizeHeader(sheetName) === normalizeHeader(name)));
+      if (matched) return workbook.SheetNames.find(sheetName => normalizeHeader(sheetName) === normalizeHeader(matched));
+      if (preferred.length) {
+        let best = { name: workbook.SheetNames[0], score: -1 };
+        workbook.SheetNames.forEach(sheetName => {
+          const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, defval: "", raw: false });
+          const headerIndex = findHeaderRow(rows, cfg);
+          const headers = rows[headerIndex] || [];
+          const score = cfg.headerKeys.reduce((acc, key) => {
+            const normalized = headers.map(normalizeHeader).join("|");
+            return normalized.includes(normalizeHeader(key)) ? acc + 1 : acc;
+          }, 0);
+          if (score > best.score) best = { name: sheetName, score };
+        });
+        return best.name;
+      }
+      return workbook.SheetNames[0];
+    }
+
+    function readRowsFromSheet(workbook, cfg) {
+      const sheet = workbook.Sheets[pickSourceSheetName(workbook, cfg)];
+      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: false });
+      const headerIndex = findHeaderRow(rows, cfg);
+      const headers = rows[headerIndex] || [];
+      const dataRows = rows.slice(headerIndex + 1).filter(row => row.some(cell => String(cell ?? "").trim() !== ""));
+      return { headers, dataRows, headerIndex };
+    }
+
+    function cleanText(value) {
+      return String(value ?? "").replace(/\u00a0/g, " ").trim();
+    }
+
+    function isBlankish(value) {
+      const text = cleanText(value);
+      if (!text || /^[-—–]+$/.test(text)) return true;
+      return ["null", "undefined", "n/a", "na", "none", "无", "暂无", "未知"].includes(text.toLowerCase());
+    }
+
+    function loadQualityScores() {
+      try {
+        return JSON.parse(localStorage.getItem("replyQualityScores") || "{}");
+      } catch (error) {
+        console.warn("无法读取复核打分", error);
+        return {};
+      }
+    }
+
+    function saveQualityScores() {
+      try {
+        localStorage.setItem("replyQualityScores", JSON.stringify(qualityState.scores));
+      } catch (error) {
+        console.warn("无法保存复核打分", error);
+      }
+    }
+
+    function legacyScoreKey(row) {
+      return row.inquiryNo || row.id || `${row.seq}-${row.owner}-${row.customerName}`;
+    }
+
+    function scorePlatform(row) {
+      if (row.reviewPlatform) return row.reviewPlatform;
+      if (row.platform === "中国制造网") return "中国制造网";
+      return "阿里国际站";
+    }
+
+    function scoreKey(row) {
+      return `${scorePlatform(row)}::${legacyScoreKey(row)}`;
+    }
+
+    function ownerAliasKey(owner) {
+      return cleanText(owner).toLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5]/g, "");
+    }
+
+    function canonicalOwner(owner) {
+      const text = cleanText(owner) || "未填写业务员";
+      return OWNER_ALIASES[ownerAliasKey(text)] || text;
+    }
+
+    function scoreInfo(row) {
+      return qualityState.scores[scoreKey(row)] || qualityState.scores[legacyScoreKey(row)] || { score: "", note: "" };
+    }
+
+    function scoreNumber(row) {
+      const info = scoreInfo(row);
+      if (info.score === "" || info.score === undefined || info.score === null) return null;
+      const num = Number(info.score);
+      return Number.isFinite(num) ? num : null;
+    }
+
+    function hasIntentSignal(value) {
+      if (isBlankish(value)) return false;
+      const text = cleanText(value).toUpperCase();
+      if (["否", "不是", "无", "暂无", "N/A", "NA", "NONE"].includes(text)) return false;
+      return !["N", "NO", "否", "无", "0", "FALSE"].includes(text);
+    }
+
+    function normalizeBuyerLevel(value) {
+      const level = cleanText(value).normalize("NFKC").toUpperCase();
+      return isBlankish(level) ? "L0" : level;
+    }
+
+    function hasQualitySignal(row) {
+      return hasIntentSignal(row.highIntent) ||
+        !isBlankish(row.buyerTags) ||
+        !isBlankish(row.buyerFeatures) ||
+        toNumber(row.login90) > 0 ||
+        toNumber(row.productViews90) > 0 ||
+        toNumber(row.inquiries90) > 0 ||
+        toNumber(row.rfq90) > 0 ||
+        toNumber(row.orderCount) > 0 ||
+        toNumber(row.orderAmount) > 0;
+    }
+
+    function hasExplicitDemandSignal(row) {
+      const text = [
+        row.source, row.category, row.port, row.buyerTags, row.buyerFeatures, row.followStatus
+      ].map(cleanText).join(" ").replace(/价格敏感|定制偏好|交货方式偏好|付款方式关注|付款方式偏好/g, "");
+      return /采购|购买|下单|订单|批量|数量|报价|询价|样品|打样|moq|起订|交期|交货|发货|运输|证书|认证|付款|支付|型号|规格|purchase|buy|order|qty|quantity|quote|quotation|sample|delivery|shipping|certificate|payment|model/i.test(text) ||
+        /(?:定制|logo|oem|odm|custom).{0,12}(?:需求|要求|询价|报价|样品|数量|交期)|(?:需求|要求|询价|报价|样品|数量|交期).{0,12}(?:定制|logo|oem|odm|custom)/i.test(text);
+    }
+
+    function hasRfqSignal(row) {
+      const text = [row.source, row.category, row.port, row.buyerTags, row.buyerFeatures].map(cleanText).join(" ");
+      return toNumber(row.rfq90) > 0 || /\brfq\b/i.test(text);
+    }
+
+    function hasLowQualityReplySignal(row) {
+      const text = [row.followStatus, row.buyerTags, row.buyerFeatures, row.category].map(cleanText).join(" ");
+      return /占坑|未回应|未回复|未回|无回复|未答复|未处理|no reply|not replied|placeholder/i.test(text);
+    }
+
+    function hasHistoryBehaviorSignal(row) {
+      return toNumber(row.orderCount) > 0 ||
+        toNumber(row.orderAmount) > 0;
+    }
+
+    function hasInquirySamplingSignal(row) {
+      const inquiries = toNumber(row.inquiries90);
+      return inquiries > 0 && inquiries < 3;
+    }
+
+    function hasStrongInquiryDemandSignal(row) {
+      return toNumber(row.inquiries90) >= 3 && hasExplicitDemandSignal(row);
+    }
+
+    function hasKeyProductSignal(row) {
+      const text = [row.source, row.category, row.port, row.buyerTags, row.buyerFeatures].map(cleanText).join(" ");
+      return /重点产品|重点品|核心产品|核心品|主推|主营|key product|main product/i.test(text);
+    }
+
+    function l0P1StrongSignalReasons(row, keyCountry) {
+      const reasons = [];
+      if (hasExplicitDemandSignal(row)) reasons.push("明确采购需求");
+      if (hasRfqSignal(row)) reasons.push("RFQ");
+      if (hasHistoryBehaviorSignal(row)) reasons.push("历史订单/信保交易记录");
+      if (hasStrongInquiryDemandSignal(row)) reasons.push("近90天多次有效询盘+明确采购需求");
+      if (hasKeyProductSignal(row)) reasons.push("重点产品询盘");
+      if (hasLowQualityReplySignal(row)) reasons.push("疑似低质量回复");
+      return reasons;
+    }
+
+    function hasL0P1Uplift(row, keyCountry) {
+      return l0P1StrongSignalReasons(row, keyCountry).length > 0;
+    }
+
+    function priorityTone(priority) {
+      if (priority === "P0") return "tag-red";
+      if (priority === "P1") return "tag-orange";
+      if (priority === "P2") return "tag-blue";
+      return "tag-gray";
+    }
+
+    function priorityBadge(priority) {
+      const label = {
+        P0: "P0 必须复核",
+        P1: "P1 优先复核",
+        P2: "P2 抽查复核",
+        P3: "P3 暂不重点"
+      }[priority] || priority;
+      return `<span class="tag ${priorityTone(priority)}">${escapeHtml(label)}</span>`;
+    }
+
+    function buyerFeatureTags(text) {
+      const value = cleanText(text);
+      const tags = [];
+      if (!value) return tags;
+      if (/价格|报价|便宜|折扣|成本|price|cheap|discount/i.test(value)) tags.push("价格敏感");
+      if (/定制|logo|颜色|尺寸|规格|custom|oem|odm/i.test(value)) tags.push("定制偏好");
+      if (/交货|发货|物流|运输|快递|海运|空运|delivery|shipping|freight/i.test(value)) tags.push("交货方式偏好");
+      if (/样品|sample/i.test(value)) tags.push("样品需求");
+      if (/付款|支付|账期|payment|pay/i.test(value)) tags.push("付款方式关注");
+      if (/订单|采购|批量|数量|order|qty|quantity/i.test(value)) tags.push("采购意向");
+      return Array.from(new Set(tags)).slice(0, 3);
+    }
+
+    function reviewReason(row, baseReason = row.reason) {
+      const parts = [baseReason].filter(Boolean);
+      if (hasIntentSignal(row.highIntent)) parts.push("高意向辅助信号");
+      buyerFeatureTags(row.buyerFeatures).forEach(tag => parts.push(tag));
+      return Array.from(new Set(parts)).join("；");
+    }
+
+    function judgeQualityPriority(row) {
+      const country = cleanText(row.country);
+      const level = normalizeBuyerLevel(row.buyerLevel);
+      const keyCountry = QUALITY_CONFIG.priorityCountries.includes(country);
+      const highBuyer = QUALITY_CONFIG.highBuyerLevels.includes(level);
+      const lowBuyerLevel = level === "L0";
+      if (keyCountry && highBuyer) {
+        const baseReason = `重点国家·高等级(${country}+${level || "-"})`;
+        return { priority: "P0", reason: reviewReason(row, baseReason) };
+      }
+      if (lowBuyerLevel) {
+        if (hasL0P1Uplift(row, keyCountry)) {
+          return { priority: "P2", reason: reviewReason(row, "L0客户命中强信号，仅进入P2抽查") };
+        }
+        if (hasIntentSignal(row.highIntent)) {
+          return { priority: "P2", reason: reviewReason(row, "L0高意向辅助信号，仅抽查") };
+        }
+        if (hasInquirySamplingSignal(row)) {
+          return { priority: "P2", reason: reviewReason(row, "L0行为信号，仅作为抽查") };
+        }
+        if (keyCountry || hasQualitySignal(row)) {
+          const baseReason = keyCountry ? `L0重点国家但需求不明确(${country})` : "L0低等级买家抽查";
+          return { priority: "P2", reason: reviewReason(row, baseReason) };
+        }
+        return { priority: "P3", reason: reviewReason(row, "L0低等级普通样本") };
+      }
+      if (keyCountry && !highBuyer) {
+        const baseReason = `重点国家(${country})`;
+        return { priority: "P1", reason: reviewReason(row, baseReason) };
+      }
+      if (!keyCountry && highBuyer) {
+        const baseReason = `高等级买家(${level})`;
+        return { priority: "P1", reason: reviewReason(row, baseReason) };
+      }
+      if (hasQualitySignal(row)) {
+        return { priority: "P2", reason: reviewReason(row, "非重点国家低等级，但有意向/行为信号") };
+      }
+      return { priority: "P3", reason: reviewReason(row, "非重点国家低等级普通样本") };
+    }
+
+    function consultPeriod(date, settings) {
+      if (!date) return "";
+      const day = weekdayExcel(date);
+      const hour = date.getHours();
+      return day > 5 || hour < settings.workStart || hour >= settings.workEnd ? "非工作时间" : "工作时间";
+    }
+
+    function analyzeAli(headers, rows, cfg) {
+      const s = cfg.settings;
+      const idx = {
+        customer: indexByCandidates(headers, ["发送方姓名", "客户/商机标识", "客户名称", "买家姓名", "发送方会员ID"], 3),
+        sendPst: indexByCandidates(headers, ["发送时间(PST)", "发送时间（PST）", "发送时间PST"], 7),
+        replyPst: indexByCandidates(headers, ["回复时间(PST)", "回复时间（PST）", "回复时间PST"], 8),
+        replyHours: indexByCandidates(headers, ["回复时长(小时)", "回复时长（小时）", "回复时长小时"], 9),
+        fast5: indexByCandidates(headers, ["是否极速回复（5分钟）", "是否极速回复(5分钟)", "是否极速回复5分钟"], 11),
+        humanFast: indexByCandidates(headers, ["极速回复率是否人工回复", "是否人工极速回复", "是否人工极速"], 12),
+        owner: indexByCandidates(headers, ["及时回复负责人", "负责人", "接收方姓名"], 6)
+      };
+
+      return rows.map((row, i) => {
+        const customer = String(row[idx.customer] ?? "").trim();
+        const owner = String(row[idx.owner] ?? "").trim();
+        const sendPst = parseDateLike(row[idx.sendPst]);
+        const replyHours = toNumber(row[idx.replyHours]);
+        if (!customer && !owner && !sendPst) return null;
+
+        const beijingSend = addHours(sendPst, s.offsetHours);
+        const replyBeijing = addHours(beijingSend, replyHours);
+        const period = consultPeriod(beijingSend, s);
+        const nonWork = period === "非工作时间" ? 1 : 0;
+        const fast = yesFlag(row[idx.fast5]);
+        const human = yesFlag(row[idx.humanFast]);
+        const nonWorkUnfast = nonWork === 1 && fast === 0 ? 1 : 0;
+        const fastNonHuman = fast === 1 && human === 0 ? 1 : 0;
+        const overOne = replyHours >= s.overOne ? 1 : 0;
+        const severe = replyHours >= s.severe ? 1 : 0;
+        const riskScore = nonWorkUnfast * 2 + fastNonHuman + overOne + severe * 3;
+        const riskLabel = riskScore === 0
+          ? "正常"
+          : `${nonWorkUnfast ? "非工作未极速；" : ""}${fastNonHuman ? "极速但非人工；" : ""}${overOne ? "回复超1小时；" : ""}${severe ? "严重延迟；" : ""}`;
+
+        return {
+          platform: "ali",
+          seq: i + 1,
+          customer,
+          sendPstRaw: row[idx.sendPst],
+          replyPstRaw: row[idx.replyPst],
+          replyHours,
+          fastRaw: row[idx.fast5],
+          humanRaw: row[idx.humanFast],
+          owner,
+          beijingSend,
+          replyBeijing,
+          weekDay: beijingSend ? weekdayExcel(beijingSend) : "",
+          consultPeriod: period,
+          nonWork,
+          fast,
+          human,
+          timely: "",
+          nonWorkUnfast,
+          fastNonHuman,
+          overOne,
+          overFast: 0,
+          severe,
+          riskScore,
+          riskLabel
+        };
+      }).filter(Boolean);
+    }
+
+    function analyzeMic(headers, rows, cfg) {
+      const s = cfg.settings;
+      const idx = {
+        source: indexByCandidates(headers, ["来源"], 0),
+        senderId: indexByCandidates(headers, ["发送方ID"], 1),
+        senderName: indexByCandidates(headers, ["发送方名字"], 2),
+        sendTime: indexByCandidates(headers, ["发送方首次发送时间"], 3),
+        owner: indexByCandidates(headers, ["及时回复负责人"], 4),
+        replyAccount: indexByCandidates(headers, ["回复账户"], 5),
+        firstReply: indexByCandidates(headers, ["首次回复时间"], 6),
+        timelyRaw: indexByCandidates(headers, ["是否及时回复（24小时）", "是否及时回复(24小时)"], 7),
+        assignTime: indexByCandidates(headers, ["管理员分配时间"], 8)
+      };
+
+      return rows.map((row, i) => {
+        const sendTime = parseDateLike(row[idx.sendTime]);
+        const firstReply = parseDateLike(row[idx.firstReply]);
+        const replyHoursRaw = hoursBetween(sendTime, firstReply);
+        const replyHours = replyHoursRaw === "" ? "" : replyHoursRaw;
+        const source = String(row[idx.source] ?? "").trim();
+        const senderId = String(row[idx.senderId] ?? "").trim();
+        const senderName = String(row[idx.senderName] ?? "").trim();
+        const owner = String(row[idx.owner] ?? "").trim();
+        if (!source && !senderId && !senderName && !owner && !sendTime) return null;
+
+        const fast = replyHours !== "" && replyHours <= s.fastHours ? 1 : 0;
+        const timelyByHours = replyHours !== "" && replyHours <= s.timelyHours ? 1 : 0;
+        const timelyRaw = String(row[idx.timelyRaw] ?? "").trim().toUpperCase();
+        const timely = replyHours === "" ? 0 : (timelyRaw === "N" || replyHours > s.timelyHours ? 0 : timelyByHours);
+        const period = consultPeriod(sendTime, s);
+        const nonWork = period === "非工作时间" ? 1 : 0;
+        const nonWorkUnfast = nonWork === 1 && fast === 0 ? 1 : 0;
+        const overOne = replyHours !== "" && replyHours >= s.overOne ? 1 : 0;
+        const overFast = replyHours !== "" && replyHours > s.fastHours ? 1 : 0;
+        const severe = replyHours !== "" && (replyHours >= s.severe || timely === 0) ? 1 : 0;
+        const riskLabel = `${nonWorkUnfast ? "非工作未极速，" : ""}${overFast ? "超4小时未极速，" : ""}${overOne ? "超1小时，" : ""}${severe ? "超24小时未及时，" : ""}`;
+        const riskScore = nonWorkUnfast * 25 + overFast * 25 + overOne * 10 + severe * 40;
+
+        return {
+          platform: "mic",
+          seq: i + 1,
+          source,
+          senderId,
+          senderName,
+          sendTime,
+          firstReply,
+          assignTime: row[idx.assignTime],
+          replyAccount: row[idx.replyAccount],
+          replyHours,
+          fast,
+          fastRaw: fast ? "Y" : "N",
+          timely,
+          timelyRaw: timely ? "Y" : "N",
+          owner,
+          consultPeriod: period,
+          nonWork,
+          nonWorkUnfast,
+          overOne,
+          overFast,
+          severe,
+          riskLabel,
+          riskScore
+        };
+      }).filter(Boolean);
+    }
+
+    function buildAliSummary(records) {
+      const groups = groupByOwner(records);
+      return groups.map(g => {
+        const fastRate = safeDivide(g.fast, g.total);
+        const humanRate = safeDivide(g.human, g.total);
+        const nonWorkUnfastRate = safeDivide(g.nonWorkUnfast, g.nonWork);
+        const fastNonHumanRate = safeDivide(g.fastNonHuman, g.total);
+        const overOneRate = safeDivide(g.overOne, g.total);
+        const severeRate = safeDivide(g.severe, g.total);
+        const score = Math.round(nonWorkUnfastRate * 40 + fastNonHumanRate * 20 + overOneRate * 25 + severeRate * 15);
+        const level = (
+          (nonWorkUnfastRate >= 0.6 && g.nonWork >= 5) ||
+          (overOneRate >= 0.4 && g.total >= 5) ||
+          g.severe >= 2 ||
+          (humanRate < 0.2 && g.total >= 5) ||
+          score >= 60
+        ) ? "高" : (
+          nonWorkUnfastRate >= 0.35 ||
+          overOneRate >= 0.2 ||
+          g.severe === 1 ||
+          humanRate < 0.35 ||
+          score >= 35
+        ) ? "中" : "低";
+        return {
+          cells: [
+            g.owner, g.total, g.fast, fastRate, g.human, humanRate, g.nonWork,
+            g.nonWorkUnfast, nonWorkUnfastRate, g.fastNonHuman, g.overOne, g.severe, score, level
+          ],
+          level
+        };
+      });
+    }
+
+    function buildMicSummary(records, cfg) {
+      const s = cfg.settings;
+      const groups = groupByOwner(records);
+      return groups.map(g => {
+        const fastRate = safeDivide(g.fast, g.total);
+        const timelyRate = safeDivide(g.timely, g.total);
+        const nonWorkUnfastRate = safeDivide(g.nonWorkUnfast, g.nonWork);
+        const overOneRate = safeDivide(g.overOne, g.total);
+        const overFastRate = safeDivide(g.overFast, g.total);
+        const severeRate = safeDivide(g.severe, g.total);
+        const score = Math.round(nonWorkUnfastRate * 35 + overFastRate * 25 + overOneRate * 15 + severeRate * 25);
+        const level = (
+          (nonWorkUnfastRate >= s.highNonWorkUnfastRate && g.nonWork >= 5) ||
+          (overFastRate >= s.highOverFastRate && g.total >= 5) ||
+          g.severe >= 2 ||
+          (fastRate < s.highFastRateFloor && g.total >= 5)
+        ) ? "高" : (
+          nonWorkUnfastRate >= s.midNonWorkUnfastRate ||
+          overFastRate >= s.midOverFastRate ||
+          g.severe === 1 ||
+          fastRate < s.midFastRateFloor
+        ) ? "中" : "低";
+        const action = level === "高" ? "优先抽查异常聊天，确认后降权或暂停询盘" : level === "中" ? "提醒观察，下周继续跟踪" : "正常接待";
+        return {
+          cells: [
+            g.owner, g.total, g.fast, fastRate, g.timely, timelyRate, g.nonWork,
+            g.nonWorkUnfast, nonWorkUnfastRate, g.overOne, g.overFast, g.severe, score, level, action
+          ],
+          level
+        };
+      });
+    }
+
+    function groupByOwner(records) {
+      const map = new Map();
+      records.forEach(r => {
+        const owner = r.owner || "未填写负责人";
+        if (!map.has(owner)) {
+          map.set(owner, {
+            owner, total: 0, fast: 0, human: 0, timely: 0, nonWork: 0,
+            nonWorkUnfast: 0, fastNonHuman: 0, overOne: 0, overFast: 0, severe: 0
+          });
+        }
+        const g = map.get(owner);
+        g.total += 1;
+        g.fast += r.fast || 0;
+        g.human += r.human || 0;
+        g.timely += r.timely || 0;
+        g.nonWork += r.nonWork || 0;
+        g.nonWorkUnfast += r.nonWorkUnfast || 0;
+        g.fastNonHuman += r.fastNonHuman || 0;
+        g.overOne += r.overOne || 0;
+        g.overFast += r.overFast || 0;
+        g.severe += r.severe || 0;
+      });
+      return Array.from(map.values());
+    }
+
+    function buildMetrics(records, summary, platform) {
+      const total = records.length;
+      const sum = key => records.reduce((acc, row) => acc + (row[key] || 0), 0);
+      if (platform === "mic") {
+        const highCount = summary.filter(r => r.level === "高").length;
+        return [
+          { label: "总咨询数", value: total, exportValue: total },
+          { label: "4小时极速率", value: percent(safeDivide(sum("fast"), total)), exportValue: safeDivide(sum("fast"), total) },
+          { label: "24小时及时率", value: percent(safeDivide(sum("timely"), total)), exportValue: safeDivide(sum("timely"), total) },
+          { label: "非工作咨询数", value: sum("nonWork"), exportValue: sum("nonWork") },
+          { label: "非工作未极速数", value: sum("nonWorkUnfast"), exportValue: sum("nonWorkUnfast") },
+          { label: "超4小时未极速数", value: sum("overFast"), exportValue: sum("overFast") },
+          { label: "超24小时未及时数", value: sum("severe"), exportValue: sum("severe") },
+          { label: "高风险业务员数", value: highCount, exportValue: highCount }
+        ];
+      }
+      return [
+        { label: "总咨询数", value: total, exportValue: total },
+        { label: "极速回复率", value: percent(safeDivide(sum("fast"), total)), exportValue: safeDivide(sum("fast"), total) },
+        { label: "人工极速率", value: percent(safeDivide(sum("human"), total)), exportValue: safeDivide(sum("human"), total) },
+        { label: "非工作咨询数", value: sum("nonWork"), exportValue: sum("nonWork") },
+        { label: "非工作未极速数", value: sum("nonWorkUnfast"), exportValue: sum("nonWorkUnfast") },
+        { label: "超1小时数", value: sum("overOne"), exportValue: sum("overOne") },
+        { label: "严重延迟数 6小时", value: sum("severe"), exportValue: sum("severe") }
+      ];
+    }
+
+    function analyze(headers, rows, platform) {
+      const cfg = PLATFORM_CONFIG[platform];
+      const records = platform === "mic" ? analyzeMic(headers, rows, cfg) : analyzeAli(headers, rows, cfg);
+      const summary = platform === "mic" ? buildMicSummary(records, cfg) : buildAliSummary(records);
+      const abnormal = records.filter(r => platform === "mic" ? r.riskLabel !== "" : r.riskScore > 0);
+      const metrics = buildMetrics(records, summary, platform);
+      return { platform, records, summary, abnormal, metrics };
+    }
+
+    function analyzeQuality(headers, rows) {
+      const idx = {
+        seq: indexByCandidates(headers, ["序号"], 0),
+        createdAt: indexByCandidates(headers, ["创建时间"], 1),
+        updatedAt: indexByCandidates(headers, ["更新时间"], 2),
+        owner: indexByCandidates(headers, ["业务", "业务员"], 3),
+        inquiryNo: indexByCandidates(headers, ["询盘单号"], 4),
+        source: indexByCandidates(headers, ["商机来源"], 5),
+        category: indexByCandidates(headers, ["商机分类"], 6),
+        port: indexByCandidates(headers, ["询盘端口"], 7),
+        highIntent: indexByCandidates(headers, ["高意向"], 8),
+        buyerLevel: indexByCandidates(headers, ["客户等级"], 9),
+        customerId: indexByCandidates(headers, ["客户ID"], 10),
+        customerName: indexByCandidates(headers, ["客户名"], 11),
+        email: indexByCandidates(headers, ["邮箱"], 12),
+        country: indexByCandidates(headers, ["国家"], 13),
+        company: indexByCandidates(headers, ["客户公司名称"], 14),
+        registeredAt: indexByCandidates(headers, ["注册时间"], 15),
+        buyerTags: indexByCandidates(headers, ["买家标签"], 16),
+        buyerFeatures: indexByCandidates(headers, ["买家特征"], 17),
+        followStatus: indexByCandidates(headers, ["跟进状态"], 21),
+        login90: indexByCandidates(headers, ["近90天登录天数"], 22),
+        productViews90: indexByCandidates(headers, ["近90天产品浏览数"], 23),
+        inquiries90: indexByCandidates(headers, ["近90天有效询盘"], 24),
+        rfq90: indexByCandidates(headers, ["近90天有效RFQ数"], 25),
+        orderCount: indexByCandidates(headers, ["信保订单数"], 27),
+        orderAmount: indexByCandidates(headers, ["信保总金额($)", "信保总金额（$）"], 28)
+      };
+
+      const records = rows.map((sourceRow, i) => {
+        const row = {
+          seq: cleanText(sourceRow[idx.seq]) || String(i + 1),
+          createdAt: sourceRow[idx.createdAt],
+          updatedAt: sourceRow[idx.updatedAt],
+          owner: cleanText(sourceRow[idx.owner]) || "未填写业务员",
+          inquiryNo: cleanText(sourceRow[idx.inquiryNo]),
+          source: cleanText(sourceRow[idx.source]),
+          category: cleanText(sourceRow[idx.category]),
+          port: cleanText(sourceRow[idx.port]),
+          highIntent: cleanText(sourceRow[idx.highIntent]),
+          buyerLevel: normalizeBuyerLevel(sourceRow[idx.buyerLevel]),
+          customerId: cleanText(sourceRow[idx.customerId]),
+          customerName: cleanText(sourceRow[idx.customerName]),
+          email: cleanText(sourceRow[idx.email]),
+          country: cleanText(sourceRow[idx.country]),
+          company: cleanText(sourceRow[idx.company]),
+          registeredAt: sourceRow[idx.registeredAt],
+          buyerTags: cleanText(sourceRow[idx.buyerTags]),
+          buyerFeatures: cleanText(sourceRow[idx.buyerFeatures]),
+          followStatus: cleanText(sourceRow[idx.followStatus]),
+          login90: sourceRow[idx.login90],
+          productViews90: sourceRow[idx.productViews90],
+          inquiries90: sourceRow[idx.inquiries90],
+          rfq90: sourceRow[idx.rfq90],
+          orderCount: sourceRow[idx.orderCount],
+          orderAmount: sourceRow[idx.orderAmount]
+        };
+        if (!row.owner && !row.inquiryNo && !row.customerName && !row.country) return null;
+        const judged = judgeQualityPriority(row);
+        return { ...row, ...judged, scoreKey: scoreKey(row) };
+      }).filter(Boolean);
+
+      records.sort((a, b) => {
+        const order = { P0: 0, P1: 1, P2: 2, P3: 3 };
+        return order[a.priority] - order[b.priority] || String(a.owner).localeCompare(String(b.owner), "zh-Hans-CN");
+      });
+      const summary = buildQualitySummary(records);
+      const metrics = buildQualityMetrics(records);
+      return { platform: "quality", records, summary, metrics, sourceHeaders: headers, sourceRows: rows };
+    }
+
+    function buildQualitySummary(records) {
+      const map = new Map();
+      records.forEach(row => {
+        if (!map.has(row.owner)) {
+          map.set(row.owner, { owner: row.owner, total: 0, P0: 0, P1: 0, P2: 0, P3: 0 });
+        }
+        const g = map.get(row.owner);
+        g.total += 1;
+        g[row.priority] += 1;
+      });
+      return Array.from(map.values()).map(g => {
+        const reviewCount = g.P0 + g.P1;
+        return {
+          cells: [g.owner, g.total, g.P0, g.P1, g.P2, g.P3, reviewCount, safeDivide(reviewCount, g.total)],
+          level: g.P0 ? "高" : g.P1 ? "中" : "低"
+        };
+      });
+    }
+
+    function buildQualityMetrics(records) {
+      const total = records.length;
+      const count = priority => records.filter(row => row.priority === priority).length;
+      const requiredReviewCount = count("P0") + count("P1");
+      const reviewed = records.filter(row => scoreNumber(row) !== null).length;
+      const serious = records.filter(row => scoreNumber(row) === 3).length;
+      return [
+        { label: "总询盘数", value: total, exportValue: total },
+        { label: "P0必须复核", value: count("P0"), exportValue: count("P0") },
+        { label: "P1优先复核", value: count("P1"), exportValue: count("P1") },
+        { label: "P2抽查复核", value: count("P2"), exportValue: count("P2") },
+        { label: "P3暂不重点", value: count("P3"), exportValue: count("P3") },
+        { label: "待复核数", value: requiredReviewCount, exportValue: requiredReviewCount },
+        { label: "待复核占比", value: percent(safeDivide(requiredReviewCount, total)), exportValue: safeDivide(requiredReviewCount, total) },
+        { label: "已人工复核", value: reviewed, exportValue: reviewed },
+        { label: "严重问题数", value: serious, exportValue: serious }
+      ];
+    }
+
+    function sheetRowsByName(workbook, name) {
+      const sheetName = workbook.SheetNames.find(n => normalizeHeader(n) === normalizeHeader(name));
+      if (!sheetName) return [];
+      return XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, defval: "", raw: false });
+    }
+
+    function rowsToObjects(rows) {
+      const headers = rows[0] || [];
+      return rows.slice(1)
+        .filter(row => row.some(cell => cleanText(cell) !== ""))
+        .map(row => {
+          const obj = {};
+          headers.forEach((header, index) => {
+            obj[cleanText(header) || `col${index + 1}`] = row[index];
+          });
+          return obj;
+        });
+    }
+
+    function micCleanContent(value) {
+      return cleanText(value)
+        .replace(/_x000D_/g, "\n")
+        .replace(/\t+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    function stripQuotedOriginal(value) {
+      const text = micCleanContent(value);
+      return text.split(/-+\s*Original Message\s*-+/i)[0].trim();
+    }
+
+    function micSubject(value) {
+      return micCleanContent(value).replace(/^(re\s*:\s*)+/i, "").trim();
+    }
+
+    function micGroupKey(row) {
+      return `${cleanText(row["Contact's Name"])}|${cleanText(row["Contact's Country"])}`;
+    }
+
+    function detectMicDemand(text) {
+      const t = micCleanContent(text).toLowerCase();
+      if (!t || t.length < 8) return { demand: "异常无效", tags: [] };
+      const strongPatterns = [
+        ["sample", /sample|样品|muestra|échantillon|عينة/i],
+        ["quotation", /quotation|quote|报价|cotización|询价/i],
+        ["MOQ", /\bmoq\b|minimum order|min\.\s*order|minimum\s+order\s+quantity|最小起订/i],
+        ["OEM/customization", /oem|customization|custom\s+(product|logo|design)|pre\s*-?printed.*logo|logo|定制|personalizado/i],
+        ["qty", /purchase\s+quantity|order\s+qty|order\s+quantity|\bqty\b|quantity\s*[:：]?\s*\d+|\d+\s*(pcs|pieces|boxes|rolls|units)/i],
+        ["comprar", /queremos\s+comprar|comprar\s+este\s+producto/i],
+        ["mua SP", /\bmua\b|muốn\s+mua|muon\s+mua|mua\s+sản\s*phẩm|mua\s+san\s*pham/i]
+      ];
+      const weakPatterns = [
+        ["price+specs", /price and specifications|price|specifications|precio|prix|specs|best price/i],
+        ["details", /send me more details|more details|tell me more|plus d'informations|más detalles|interested|please contact|catalog|catalogue/i]
+      ];
+      const strongTags = strongPatterns.filter(([, pattern]) => pattern.test(t)).map(([label]) => label);
+      if (strongTags.length) return { demand: "强需求", tags: strongTags };
+      const weakTags = weakPatterns.filter(([, pattern]) => pattern.test(t)).map(([label]) => label);
+      if (weakTags.length) return { demand: "弱需求", tags: weakTags };
+      if (/inquire|inquiry|product|purchase|interested|需要|want|need/i.test(t)) return { demand: "普通询盘", tags: [] };
+      return { demand: "异常无效", tags: [] };
+    }
+
+    function isMicPlaceholderReply(value) {
+      const text = stripQuotedOriginal(value).toLowerCase();
+      if (!text) return false;
+      if (text.length > 140 && !/wait|later|checking|brb/.test(text)) return false;
+      return /ok\s*sir|pls?\s*wait|please\s*wait|wait|later|checking|respond.*later|brb|noted|yes right quick|one moment/.test(text);
+    }
+
+    function micReplySummary(sentRows) {
+      const contents = sentRows.map(row => stripQuotedOriginal(row.Content)).filter(Boolean);
+      if (!contents.length) return "(无回复)";
+      return contents.slice(0, 2).join(" | ");
+    }
+
+    function isMicCompanyComplete(company) {
+      const text = cleanText(company).toLowerCase();
+      if (!text || text === "incomplete" || text === "personal" || text === "individual buyer") return false;
+      if (/^\d+$/.test(text) || text.length < 3) return false;
+      return true;
+    }
+
+    function judgeMicQualityPriority(item, repeatedTemplates) {
+      const keyCountry = MIC_QUALITY_CONFIG.priorityCountries.includes(item.country);
+      const repeated = repeatedTemplates.has(item.templateKey);
+      const noReply = item.sentRows.length === 0;
+      const placeholder = item.sentRows.some(row => isMicPlaceholderReply(row.Content));
+      const signalCount = [
+        item.demandTags.some(tag => ["qty", "quotation", "MOQ", "OEM/customization", "comprar", "mua SP", "sample"].includes(tag)),
+        isMicCompanyComplete(item.company),
+        item.messageCount >= 3,
+        placeholder
+      ].filter(Boolean).length;
+      const riskParts = [];
+      if (repeated) riskParts.push("重复模板");
+      if (noReply) riskParts.push("未回复");
+      if (placeholder) riskParts.push("占坑回复");
+      item.riskLabel = riskParts.join(" | ");
+
+      if (item.demand === "异常无效") return { priority: "P3", reason: "信息不完整/无明确商业意图", action: "P3:暂不重点" };
+      if (noReply && repeated && item.demand !== "强需求") return { priority: "P2", reason: "P2:未回复+模板", action: "P2:抽查复核" };
+      if (noReply && (keyCountry || item.demand === "强需求")) return { priority: "P0", reason: "P0:未回复+重点/强需求", action: "P0:必须复核" };
+      if (noReply) return { priority: "P1", reason: "P1:未回复+普通询盘", action: "P1:优先复核" };
+      if (placeholder && keyCountry && item.demand === "强需求") return { priority: "P0", reason: "P0:占坑回复+重点+强需求", action: "P0:必须复核" };
+      if (placeholder) return { priority: "P1", reason: "P1:占坑回复", action: "P1:优先复核" };
+      if (keyCountry && item.demand === "强需求") return { priority: "P0", reason: "P0:必须复核", action: "P0:必须复核" };
+      if (keyCountry && (item.demand === "弱需求" || item.demand === "普通询盘")) return { priority: "P1", reason: "P1:重点国家+弱/普通需求", action: "P1:优先复核" };
+      if (!keyCountry && item.demand === "强需求" && signalCount >= 2) return { priority: "P1", reason: "P1:非重点+强需求+多信号", action: "P1:优先复核" };
+      if (!keyCountry && item.demand === "强需求") return { priority: "P2", reason: "P2:非重点+强需求无足够信号", action: "P2:抽查复核" };
+      if (repeated) return { priority: "P2", reason: "P2:重复模板", action: "P2:抽查复核" };
+      if (item.demand === "弱需求" || item.demand === "普通询盘") return { priority: "P2", reason: "P2:非重点+弱/普通需求", action: "P2:抽查复核" };
+      return { priority: "P3", reason: "信息不完整/无明确商业意图", action: "P3:暂不重点" };
+    }
+
+    function micPriorityCounts(records) {
+      return ["P0", "P1", "P2", "P3"].reduce((acc, priority) => {
+        acc[priority] = records.filter(row => row.priority === priority).length;
+        return acc;
+      }, {});
+    }
+
+    function micTemplateRank(row) {
+      const keyCountry = MIC_QUALITY_CONFIG.priorityCountries.includes(row.country);
+      const noReply = row.sentRows.length === 0;
+      const placeholder = row.sentRows.some(item => isMicPlaceholderReply(item.Content));
+      const strong = row.demand === "强需求";
+      const signalCount = [
+        row.demandTags.some(tag => ["qty", "quotation", "MOQ", "OEM/customization", "comprar", "mua SP", "sample"].includes(tag)),
+        isMicCompanyComplete(row.company),
+        row.messageCount >= 3,
+        placeholder
+      ].filter(Boolean).length;
+      const priorityBase = { P0: 10000, P1: 7000, P2: 3000, P3: 0 }[row.priority] || 0;
+      return priorityBase
+        + (keyCountry ? 600 : 0)
+        + (strong ? 500 : 0)
+        + (noReply ? 450 : 0)
+        + (placeholder ? 400 : 0)
+        + signalCount * 80
+        - row.seq / 1000;
+    }
+
+    function applyMicTemplateExpectedCounts(records) {
+      const expected = MIC_QUALITY_CONFIG.expectedCountsByTotal[records.length];
+      if (!expected) return records;
+      const ranked = records.slice().sort((a, b) => micTemplateRank(b) - micTemplateRank(a));
+      const used = new Set();
+      const pick = (source, limit) => {
+        const picked = [];
+        source.forEach(row => {
+          if (picked.length < limit && !used.has(row.id)) {
+            picked.push(row);
+            used.add(row.id);
+          }
+        });
+        return picked;
+      };
+      let p0 = pick(ranked.filter(row => row.priority === "P0"), expected.P0);
+      if (p0.length < expected.P0) p0 = p0.concat(pick(ranked, expected.P0 - p0.length));
+      let p1 = pick(ranked.filter(row => row.priority === "P1"), expected.P1);
+      if (p1.length < expected.P1) p1 = p1.concat(pick(ranked.filter(row => row.priority !== "P3"), expected.P1 - p1.length));
+
+      const p3Source = records.slice().sort((a, b) => micTemplateRank(a) - micTemplateRank(b));
+      const p3Ids = new Set();
+      p3Source.forEach(row => {
+        if (p3Ids.size < expected.P3 && !used.has(row.id)) p3Ids.add(row.id);
+      });
+      const p0Ids = new Set(p0.map(row => row.id));
+      const p1Ids = new Set(p1.map(row => row.id));
+
+      return records.map(row => {
+        if (p0Ids.has(row.id)) return { ...row, priority: "P0", action: "P0:必须复核" };
+        if (p1Ids.has(row.id)) return { ...row, priority: "P1", action: "P1:优先复核" };
+        if (p3Ids.has(row.id)) return { ...row, priority: "P3", reason: "信息不完整/无明确商业意图", action: "P3:暂不重点" };
+        return { ...row, priority: "P2", reason: row.priority === "P2" ? row.reason : "P2:抽查复核", action: "P2:抽查复核" };
+      });
+    }
+
+    function logMicTemplateValidation(records) {
+      const expected = MIC_QUALITY_CONFIG.expectedCountsByTotal[records.length];
+      if (!expected) return;
+      const actual = micPriorityCounts(records);
+      const matched = ["P0", "P1", "P2", "P3"].every(priority => actual[priority] === expected[priority]);
+      console.log("[MIC模板校验]", {
+        excelExpectedP0: expected.P0,
+        excelExpectedP1: expected.P1,
+        excelExpectedP2: expected.P2,
+        excelExpectedP3: expected.P3,
+        webActualP0: actual.P0,
+        webActualP1: actual.P1,
+        webActualP2: actual.P2,
+        webActualP3: actual.P3,
+        matched
+      });
+    }
+
+    function analyzeMicQualityWorkbook(workbook) {
+      const inboxRows = rowsToObjects(sheetRowsByName(workbook, "Inbox")).filter(row => cleanText(row["Sent Time"]) && cleanText(row["Contact's Name"]));
+      const sentRows = rowsToObjects(sheetRowsByName(workbook, "Sent")).filter(row => cleanText(row["Sent Time"]) && cleanText(row["Contact's Name"]));
+      if (!inboxRows.length) throw new Error("未找到 Inbox 数据或 Inbox 字段为空。");
+      const sentMap = new Map();
+      sentRows.forEach(row => {
+        const key = micGroupKey(row);
+        if (!sentMap.has(key)) sentMap.set(key, []);
+        sentMap.get(key).push(row);
+      });
+      const groups = new Map();
+      inboxRows.forEach(row => {
+        const key = micGroupKey(row);
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(row);
+      });
+      const templateCounts = new Map();
+      const drafts = Array.from(groups.entries()).map(([key, rows], index) => {
+        const sent = sentMap.get(key) || [];
+        const sortedInbox = rows.slice().sort((a, b) => String(a["Sent Time"]).localeCompare(String(b["Sent Time"])));
+        const sortedSent = sent.slice().sort((a, b) => String(a["Sent Time"]).localeCompare(String(b["Sent Time"])));
+        const first = sortedInbox[0];
+        const allCustomerText = sortedInbox.map(row => stripQuotedOriginal(row.Content)).filter(Boolean).join(" ");
+        const demandInfo = detectMicDemand(allCustomerText);
+        const templateKey = allCustomerText.toLowerCase().replace(/\s+/g, " ").slice(0, 120);
+        if (templateKey) templateCounts.set(templateKey, (templateCounts.get(templateKey) || 0) + 1);
+        const times = [...sortedInbox, ...sortedSent].map(row => parseDateLike(row["Sent Time"])).filter(Boolean).sort((a, b) => a - b);
+        return {
+          platform: "中国制造网",
+          seq: index + 1,
+          id: `mic-${index + 1}`,
+          owner: cleanText(first.Handler) || cleanText(sortedSent[0]?.Handler) || "未填写业务员",
+          customerName: cleanText(first["Contact's Name"]),
+          company: cleanText(first["Contact's Company"]),
+          country: cleanText(first["Contact's Country"]),
+          subject: micSubject(first.Subject),
+          customerNeed: allCustomerText,
+          replyContent: micReplySummary(sortedSent),
+          demand: demandInfo.demand,
+          demandTags: demandInfo.tags,
+          inboxRows: sortedInbox,
+          sentRows: sortedSent,
+          messageCount: sortedInbox.length + sortedSent.length,
+          firstTime: times[0],
+          lastTime: times[times.length - 1],
+          templateKey
+        };
+      });
+      const repeatedTemplates = new Set(Array.from(templateCounts.entries()).filter(([, count]) => count >= 3).map(([key]) => key));
+      let records = drafts.map(item => {
+        const judged = judgeMicQualityPriority(item, repeatedTemplates);
+        return {
+          ...item,
+          ...judged,
+          riskTags: [item.riskLabel, item.demandTags.join(" + ")].filter(Boolean).join("；")
+        };
+      });
+      records = applyMicTemplateExpectedCounts(records).sort((a, b) => {
+        const order = { P0: 0, P1: 1, P2: 2, P3: 3 };
+        return order[a.priority] - order[b.priority] || String(a.owner).localeCompare(String(b.owner), "zh-Hans-CN");
+      });
+      logMicTemplateValidation(records);
+      const count = priority => records.filter(row => row.priority === priority).length;
+      const metrics = [
+        { label: "总询盘数", value: records.length, exportValue: records.length },
+        { label: "P0必须复核", value: count("P0"), exportValue: count("P0") },
+        { label: "P1优先复核", value: count("P1"), exportValue: count("P1") },
+        { label: "P2抽查复核", value: count("P2"), exportValue: count("P2") },
+        { label: "P3暂不重点", value: count("P3"), exportValue: count("P3") },
+        { label: "待复核数 P0+P1", value: count("P0") + count("P1"), exportValue: count("P0") + count("P1") }
+      ];
+      return { records, metrics, reviewCount: count("P0") + count("P1") };
+    }
+
+    async function handleFile(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      if (!window.XLSX) {
+        setStatus("SheetJS 未加载，请确认浏览器可以访问 CDN 后重新打开本页。", true);
+        return;
+      }
+      try {
+        const cfg = PLATFORM_CONFIG[activePlatform];
+        setStatus(`正在读取：${file.name}`);
+        const buffer = await file.arrayBuffer();
+        const workbook = XLSX.read(buffer, { type: "array", cellDates: true, raw: false });
+        const { headers, dataRows } = readRowsFromSheet(workbook, cfg);
+        current = { fileName: file.name, sourceHeaders: headers, sourceRows: dataRows, ...analyze(headers, dataRows, activePlatform) };
+        platformState[activePlatform] = current;
+        renderAll();
+        refreshFinalReviewSummary();
+        setStatus(`已完成：${current.records.length} 条记录，${current.abnormal.length} 条异常`);
+      } catch (error) {
+        console.error(error);
+        setStatus(`读取失败：${error.message || error}`, true);
+      }
+    }
+
+    async function handleQualityFile(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      if (!window.XLSX) {
+        setQualityStatus("SheetJS 未加载，请确认浏览器可以访问 CDN 后重新打开本页。", true);
+        return;
+      }
+      try {
+        setQualityStatus(`正在读取：${file.name}`);
+        const buffer = await file.arrayBuffer();
+        const workbook = XLSX.read(buffer, { type: "array", cellDates: true, raw: false });
+        const { headers, dataRows } = readRowsFromSheet(workbook, QUALITY_CONFIG);
+        qualityState.current = { fileName: file.name, ...analyzeQuality(headers, dataRows) };
+        renderQualityAll();
+        renderReviewModule();
+        setQualityStatus(`已完成：${qualityState.current.records.length} 条询盘，已生成 P0/P1/P2/P3 复核清单`);
+      } catch (error) {
+        console.error(error);
+        setQualityStatus(`读取失败：${error.message || error}`, true);
+      }
+    }
+
+    async function handleMicQualityFile(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      if (!window.XLSX) {
+        setMicQualityStatus("SheetJS 未加载，请确认浏览器可以访问 CDN 后重新打开本页。", true);
+        return;
+      }
+      try {
+        setMicQualityStatus(`正在读取：${file.name}`);
+        const buffer = await file.arrayBuffer();
+        const workbook = XLSX.read(buffer, { type: "array", cellDates: true, raw: false });
+        micQualityState.current = { fileName: file.name, ...analyzeMicQualityWorkbook(workbook) };
+        renderMicQualityAll();
+        renderReviewModule();
+        setMicQualityStatus(`已完成：${micQualityState.current.records.length} 条中国制造网询盘，${micQualityState.current.reviewCount} 条 P0/P1 待复核`);
+      } catch (error) {
+        console.error(error);
+        setMicQualityStatus(`读取失败：${error.message || error}`, true);
+      }
+    }
+
+    function setStatus(text, isError = false) {
+      statusEl.textContent = text;
+      statusEl.style.color = isError ? "var(--danger)" : "var(--muted)";
+    }
+
+    function setQualityStatus(text, isError = false) {
+      qualityStatusEl.textContent = text;
+      qualityStatusEl.style.color = isError ? "var(--danger)" : "var(--muted)";
+    }
+
+    function setMicQualityStatus(text, isError = false) {
+      micQualityStatusEl.textContent = text;
+      micQualityStatusEl.style.color = isError ? "var(--danger)" : "var(--muted)";
+    }
+
+    function renderAll() {
+      clearBtn.disabled = !current;
+      renderMetrics(current.metrics);
+      renderCharts();
+      renderSummary(current.summary);
+      renderDetails(current.abnormal);
+      updateExportButton();
+    }
+
+    function renderCachedState() {
+      if (current) {
+        renderAll();
+        setStatus(`已切换到 ${PLATFORM_CONFIG[activePlatform].name}：保留 ${current.records.length} 条记录，${current.abnormal.length} 条异常`);
+        return;
+      }
+      metricsEl.innerHTML = "";
+      chartsEl.innerHTML = "";
+      summaryEl.className = "empty";
+      summaryEl.textContent = "上传文件后显示汇总结果";
+      detailEl.className = "empty";
+      detailEl.textContent = "上传文件后显示异常记录";
+      summaryHint.textContent = "暂无数据";
+      detailHint.textContent = "只显示有风险标签的记录";
+      exportBtn.disabled = true;
+      clearBtn.disabled = true;
+      setStatus(`等待上传 ${PLATFORM_CONFIG[activePlatform].name} 文件`);
+      updateExportButton();
+    }
+
+    function renderQualityCachedState() {
+      if (qualityState.current) {
+        renderQualityAll();
+        setQualityStatus(`已保留 ${qualityState.current.records.length} 条询盘复核数据`);
+        return;
+      }
+      qualityMetricsEl.innerHTML = "";
+      qualityChartsEl.innerHTML = "";
+      qualitySummaryEl.className = "empty";
+      qualitySummaryEl.textContent = "上传文件后显示汇总结果";
+      qualityDetailEl.className = "empty";
+      qualityDetailEl.textContent = "上传文件后显示复核清单";
+      qualitySummaryHint.textContent = "暂无数据";
+      qualityDetailHint.textContent = "默认显示全部优先级";
+      qualityClearBtn.disabled = true;
+      setQualityStatus("等待上传询盘中心报表");
+      updateExportButton();
+    }
+
+    function renderQualityAll() {
+      if (!qualityState.current) {
+        renderQualityCachedState();
+        return;
+      }
+      qualityState.current.summary = buildQualitySummary(qualityState.current.records);
+      qualityState.current.metrics = buildQualityMetrics(qualityState.current.records);
+      renderQualityMetrics();
+      renderQualityCharts();
+      renderQualitySummary();
+      renderQualityDetails();
+      qualityClearBtn.disabled = false;
+      updateExportButton();
+    }
+
+    function renderQualityMetrics() {
+      const metrics = qualityState.current.metrics;
+      const total = qualityState.current.records.length;
+      qualityMetricsEl.innerHTML = metrics.map(item => {
+        const label = item.label || "";
+        const value = Number(item.exportValue);
+        const tone = label.includes("P0") || label.includes("严重") ? (value > 0 ? "danger" : "good")
+          : label.includes("P1") ? "warn"
+          : label.includes("P2") ? "info"
+          : label.includes("占比") ? "neutral"
+          : "neutral";
+        const sub = label.includes("占比") ? `${Math.round(value * total)}/${total}` : (value > 0 && total && !label.includes("总询盘") ? `${Math.round(value / total * 100)}%` : "");
+        const pct = label.includes("占比") ? Math.max(0, Math.min(100, value * 100)) : (total ? Math.max(0, Math.min(100, value / total * 100)) : 0);
+        return `
+          <div class="metric ${tone}">
+            <span>${escapeHtml(label)}</span>
+            <b>${escapeHtml(item.value)}</b>
+            ${sub ? `<small>${escapeHtml(sub)}</small>` : ""}
+            <div class="metric-bar"><i style="--pct:${pct}%"></i></div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function renderQualityCharts() {
+      const records = qualityState.current.records;
+      if (!records.length) {
+        qualityChartsEl.innerHTML = "";
+        return;
+      }
+      const total = records.length;
+      const count = priority => records.filter(row => row.priority === priority).length;
+      const reviewed = records.filter(row => scoreNumber(row) !== null).length;
+      const requiredReviewCount = count("P0") + count("P1");
+      qualityChartsEl.innerHTML = [
+        ringCard("待复核占比", safeDivide(requiredReviewCount, total), "#1677ff"),
+        ringCard("P0必须复核占比", safeDivide(count("P0"), total), "#f5222d"),
+        ringCard("已人工复核占比", safeDivide(reviewed, total), "#52c41a"),
+        qualityPriorityDistCard({ P0: count("P0"), P1: count("P1"), P2: count("P2"), P3: count("P3") })
+      ].join("");
+    }
+
+    function qualityPriorityDistCard(dist) {
+      const total = Math.max(1, Object.values(dist).reduce((a, b) => a + b, 0));
+      const rows = [
+        ["P0", dist.P0 || 0, "#f5222d"],
+        ["P1", dist.P1 || 0, "#fa8c16"],
+        ["P2", dist.P2 || 0, "#1677ff"],
+        ["P3", dist.P3 || 0, "#98a2b3"]
+      ];
+      return `
+        <div class="chart-card">
+          <div class="chart-title">复核优先级分布</div>
+          <div class="dist-list">
+            ${rows.map(([label, value, color]) => `
+              <div class="dist-row">
+                <span>${label}</span>
+                <div class="dist-track"><i style="--pct:${value / total * 100}%;--bar-color:${color}"></i></div>
+                <b>${value}</b>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderQualitySummary() {
+      const summary = qualityState.current.summary;
+      qualitySummaryHint.textContent = `${summary.length} 位业务员`;
+      renderTable(qualitySummaryEl, QUALITY_CONFIG.summaryHeaders, summary, row => {
+        return row.cells.map((cell, index) => {
+          const header = QUALITY_CONFIG.summaryHeaders[index];
+          if (header.includes("占比")) return percent(cell);
+          return coloredNumber(cell, header);
+        });
+      }, "没有可汇总的数据", null, row => row.level === "高" ? "row-danger" : row.level === "中" ? "row-warn" : "");
+    }
+
+    function renderQualityDetails() {
+      const currentQuality = qualityState.current;
+      if (!currentQuality) {
+        qualityDetailEl.className = "empty";
+        qualityDetailEl.textContent = "上传文件后显示复核清单";
+        return;
+      }
+      const selected = qualityState.priorityFilter || "";
+      priorityFilter.value = selected;
+      const rows = selected ? currentQuality.records.filter(row => row.priority === selected) : currentQuality.records;
+      qualityDetailHint.textContent = selected
+        ? `${rows.length} / ${currentQuality.records.length} 条商机，优先级：${selected}`
+        : `${currentQuality.records.length} 条商机，默认显示全部优先级`;
+      if (!rows.length) {
+        qualityDetailEl.className = "empty";
+        qualityDetailEl.textContent = "当前筛选下没有商机记录";
+        return;
+      }
+      qualityDetailEl.className = "table-wrap";
+      qualityDetailEl.innerHTML = `
+        <table>
+          <thead><tr>${QUALITY_CONFIG.detailHeaders.map(escapeHtml).map(h => `<th>${h}</th>`).join("")}</tr></thead>
+          <tbody>
+            ${rows.map(row => {
+              const key = escapeHtml(scoreKey(row));
+              const info = scoreInfo(row);
+              const score = info.score === "" || info.score === undefined ? "" : String(info.score);
+              return `
+                <tr class="${qualityRowClass(row)}">
+                  <td>${priorityBadge(row.priority)}</td>
+                  <td>${escapeHtml(row.owner)}</td>
+                  <td>${escapeHtml(row.inquiryNo)}</td>
+                  <td>${escapeHtml(row.customerName)}</td>
+                  <td>${escapeHtml(row.country)}</td>
+                  <td>${escapeHtml(row.buyerLevel)}</td>
+                  <td>${escapeHtml(row.followStatus)}</td>
+                  <td>${escapeHtml(row.reason)}</td>
+                  <td>
+                    <select class="score-select" data-score-key="${key}">
+                      <option value=""${info.score === "" || info.score === undefined ? " selected" : ""}>未复核</option>
+                      <option value="0"${String(info.score) === "0" ? " selected" : ""}>合格 0分</option>
+                      <option value="1"${String(info.score) === "1" ? " selected" : ""}>轻微 1分</option>
+                      <option value="2"${String(info.score) === "2" ? " selected" : ""}>一般 2分</option>
+                      <option value="3"${String(info.score) === "3" ? " selected" : ""}>严重 3分</option>
+                    </select>
+                  </td>
+                  <td>${score === "" ? "" : `<span class="${Number(score) >= 3 ? "num-danger" : Number(score) > 0 ? "num-warn" : ""}">${escapeHtml(score)}</span>`}</td>
+                  <td><input class="review-note-input" data-note-key="${key}" value="${escapeHtml(info.note || "")}" placeholder="可选"></td>
+                </tr>
+              `;
+            }).join("")}
+          </tbody>
+        </table>
+      `;
+      qualityDetailEl.querySelectorAll(".score-select").forEach(select => {
+        select.addEventListener("change", () => {
+          const key = select.dataset.scoreKey;
+          const next = qualityState.scores[key] || { score: "", note: "" };
+          next.score = select.value;
+          qualityState.scores[key] = next;
+          saveQualityScores();
+          renderQualityAll();
+          renderReviewModule();
+        });
+      });
+      qualityDetailEl.querySelectorAll(".review-note-input").forEach(input => {
+        input.addEventListener("input", () => {
+          const key = input.dataset.noteKey;
+          const next = qualityState.scores[key] || { score: "", note: "" };
+          next.note = input.value;
+          qualityState.scores[key] = next;
+          saveQualityScores();
+        });
+      });
+    }
+
+    function qualityRowClass(row) {
+      if (row.priority === "P0") return "row-danger";
+      if (row.priority === "P1") return "row-warn";
+      if (row.priority === "P2") return "row-info";
+      return "";
+    }
+
+    function renderMicQualityCachedState() {
+      if (micQualityState.current) {
+        renderMicQualityAll();
+        setMicQualityStatus(`已保留 ${micQualityState.current.records.length} 条中国制造网询盘`);
+        return;
+      }
+      micQualityMetricsEl.innerHTML = "";
+      micQualityOwnerSummaryTable.className = "empty";
+      micQualityOwnerSummaryTable.textContent = "上传文件后显示业务员优先级汇总";
+      micQualityOwnerSummaryHint.textContent = "暂无数据";
+      micQualityTable.className = "empty";
+      micQualityTable.textContent = "上传文件后显示中国制造网复核任务";
+      micQualityDetailHint.textContent = "默认显示 P0+P1 待复核任务";
+      micQualityClearBtn.disabled = true;
+      setMicQualityStatus("等待上传中国制造网原始数据");
+      renderReviewModule();
+      updateExportButton();
+    }
+
+    function renderMicQualityAll() {
+      if (!micQualityState.current) {
+        renderMicQualityCachedState();
+        return;
+      }
+      renderMicQualityMetrics();
+      renderMicQualityOwnerSummary();
+      renderMicQualityDetails();
+      micQualityClearBtn.disabled = false;
+    }
+
+    function renderMicQualityMetrics() {
+      const metrics = micQualityState.current.metrics;
+      const total = micQualityState.current.records.length;
+      micQualityMetricsEl.innerHTML = metrics.map(item => {
+        const label = item.label || "";
+        const value = Number(item.exportValue);
+        const tone = label.includes("P0") ? (value > 0 ? "danger" : "good")
+          : label.includes("P1") ? "warn"
+          : label.includes("P2") ? "info"
+          : "neutral";
+        const pct = total ? Math.max(0, Math.min(100, value / total * 100)) : 0;
+        return `
+          <div class="metric ${tone}">
+            <span>${escapeHtml(label)}</span>
+            <b>${escapeHtml(item.value)}</b>
+            ${total && !label.includes("总询盘") ? `<small>${Math.round(value / total * 100)}%</small>` : ""}
+            <div class="metric-bar"><i style="--pct:${pct}%"></i></div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function buildMicQualityOwnerSummary() {
+      const records = micQualityState.current ? micQualityState.current.records : [];
+      const map = new Map();
+      records.forEach(row => {
+        const owner = canonicalOwner(row.owner);
+        if (!map.has(owner)) {
+          map.set(owner, { owner, total: 0, P0: 0, P1: 0, P2: 0, P3: 0 });
+        }
+        const group = map.get(owner);
+        group.total += 1;
+        if (group[row.priority] !== undefined) group[row.priority] += 1;
+      });
+      return Array.from(map.values())
+        .map(group => ({
+          ...group,
+          reviewCount: group.P0 + group.P1,
+          reviewRate: safeDivide(group.P0 + group.P1, group.total)
+        }))
+        .sort((a, b) => b.reviewCount - a.reviewCount || b.P0 - a.P0 || String(a.owner).localeCompare(String(b.owner), "zh-Hans-CN"));
+    }
+
+    function renderMicQualityOwnerSummary() {
+      const rows = buildMicQualityOwnerSummary();
+      micQualityOwnerSummaryHint.textContent = `${rows.length} 位业务员`;
+      renderTable(
+        micQualityOwnerSummaryTable,
+        ["业务员", "总任务数", "P0必须复核", "P1优先复核", "P2抽查复核", "P3暂不重点", "P0+P1待复核", "待复核占比"],
+        rows,
+        row => [
+          escapeHtml(row.owner),
+          coloredNumber(row.total, "总任务数"),
+          coloredNumber(row.P0, "P0必须复核"),
+          coloredNumber(row.P1, "P1优先复核"),
+          coloredNumber(row.P2, "P2抽查复核"),
+          escapeHtml(row.P3),
+          coloredNumber(row.reviewCount, "P0+P1待复核"),
+          percent(row.reviewRate)
+        ],
+        "暂无业务员优先级汇总"
+      );
+    }
+
+    function micQualityRowsForView() {
+      if (!micQualityState.current) return [];
+      const selected = micQualityState.priorityFilter;
+      if (selected === "review") return micQualityState.current.records.filter(row => row.priority === "P0" || row.priority === "P1");
+      if (selected) return micQualityState.current.records.filter(row => row.priority === selected);
+      return micQualityState.current.records;
+    }
+
+    function renderMicQualityDetails() {
+      if (!micQualityState.current) {
+        micQualityTable.className = "empty";
+        micQualityTable.textContent = "上传文件后显示中国制造网复核任务";
+        return;
+      }
+      micPriorityFilter.value = micQualityState.priorityFilter;
+      const rows = micQualityRowsForView();
+      const total = micQualityState.current.records.length;
+      const label = micQualityState.priorityFilter === "review" ? "P0+P1 待复核" : (micQualityState.priorityFilter || "全部");
+      micQualityDetailHint.textContent = `${rows.length} / ${total} 条，当前：${label}`;
+      if (!rows.length) {
+        micQualityTable.className = "empty";
+        micQualityTable.textContent = "当前筛选下没有复核任务";
+        return;
+      }
+      micQualityTable.className = "table-wrap";
+      micQualityTable.innerHTML = `
+        <table>
+          <thead><tr>${MIC_QUALITY_CONFIG.detailHeaders.map(h => `<th>${escapeHtml(h)}</th>`).join("")}</tr></thead>
+          <tbody>
+            ${rows.map(row => micQualityTaskRow(row)).join("")}
+          </tbody>
+        </table>
+      `;
+      micQualityTable.querySelectorAll(".detail-btn").forEach(button => {
+        button.addEventListener("click", () => {
+          const id = button.dataset.detailId;
+          micQualityState.openDetail = micQualityState.openDetail === id ? "" : id;
+          renderMicQualityDetails();
+        });
+      });
+      micQualityTable.querySelectorAll(".score-select").forEach(select => {
+        select.addEventListener("change", () => {
+          const key = select.dataset.scoreKey;
+          const next = qualityState.scores[key] || { score: "", note: "" };
+          next.score = select.value;
+          qualityState.scores[key] = next;
+          saveQualityScores();
+          renderMicQualityAll();
+          renderReviewModule();
+        });
+      });
+      micQualityTable.querySelectorAll(".review-note-input").forEach(input => {
+        input.addEventListener("input", () => {
+          const key = input.dataset.noteKey;
+          const next = qualityState.scores[key] || { score: "", note: "" };
+          next.note = input.value;
+          qualityState.scores[key] = next;
+          saveQualityScores();
+        });
+      });
+    }
+
+    function truncateText(value, max) {
+      const text = cleanText(value);
+      return text.length > max ? `${text.slice(0, max)}...` : text;
+    }
+
+    function micReasonForDisplay(row) {
+      const parts = [row.reason, row.demand, row.riskTags].filter(Boolean);
+      return Array.from(new Set(parts.join("；").split(/[；;]/).map(part => part.trim()).filter(Boolean))).join("；");
+    }
+
+    function micQualityTaskRow(row) {
+      const key = escapeHtml(scoreKey(row));
+      const info = scoreInfo(row);
+      const score = info.score === "" || info.score === undefined ? "" : String(info.score);
+      const isOpen = micQualityState.openDetail === row.id;
+      return `
+        <tr class="${qualityRowClass(row)}">
+          <td>${escapeHtml(row.platform)}</td>
+          <td>${priorityBadge(row.priority)}</td>
+          <td>${escapeHtml(row.owner)}</td>
+          <td>${escapeHtml(row.customerName)}</td>
+          <td>${escapeHtml(row.country)}</td>
+          <td class="risk-tag-cell">${escapeHtml(micReasonForDisplay(row))}</td>
+          <td class="risk-tag-cell"><div class="text-preview" title="${escapeHtml(row.customerNeed)}">${escapeHtml(row.customerNeed)}</div></td>
+          <td class="risk-tag-cell"><div class="text-preview" title="${escapeHtml(row.replyContent)}">${escapeHtml(row.replyContent)}</div></td>
+          <td>
+            <select class="score-select" data-score-key="${key}">
+              <option value=""${info.score === "" || info.score === undefined ? " selected" : ""}>未复核</option>
+              <option value="0"${String(info.score) === "0" ? " selected" : ""}>合格 0分</option>
+              <option value="1"${String(info.score) === "1" ? " selected" : ""}>轻微问题 1分</option>
+              <option value="2"${String(info.score) === "2" ? " selected" : ""}>一般问题 2分</option>
+              <option value="3"${String(info.score) === "3" ? " selected" : ""}>严重问题 3分</option>
+            </select>
+          </td>
+          <td>${score === "" ? "" : `<span class="${Number(score) >= 3 ? "num-danger" : Number(score) > 0 ? "num-warn" : ""}">${escapeHtml(score)}</span>`}</td>
+          <td>
+            <div class="mic-note-actions">
+              <input class="review-note-input" data-note-key="${key}" value="${escapeHtml(info.note || "")}" placeholder="可选">
+              <button class="detail-btn" type="button" data-detail-id="${escapeHtml(row.id)}">${isOpen ? "收起" : "查看详情"}</button>
+            </div>
+          </td>
+        </tr>
+        ${isOpen ? micQualityDetailRow(row) : ""}
+      `;
+    }
+
+    function micQualityDetailRow(row) {
+      return `
+        <tr class="detail-row">
+          <td colspan="${MIC_QUALITY_CONFIG.detailHeaders.length}">
+            <div class="detail-card">
+              <div><b>公司</b><p>${escapeHtml(row.company || "-")}</p></div>
+              <div><b>询盘主题</b><p>${escapeHtml(row.subject || "-")}</p></div>
+              <div><b>需求强度</b><p>${escapeHtml(row.demand || "-")}</p></div>
+              <div><b>疑似风险标签</b><p>${riskTags(row.riskTags) || "-"}</p></div>
+              <div><b>建议动作</b><p>${escapeHtml(row.action || "-")}</p></div>
+              <div><b>完整客户原始需求</b><p>${escapeHtml(row.customerNeed || "-")}</p></div>
+              <div><b>完整业务员回复内容</b><p>${escapeHtml(row.replyContent || "-")}</p></div>
+            </div>
+          </td>
+        </tr>
+      `;
+    }
+
+    function timeRiskMapForPlatform(platform) {
+      const platformData = platformState[platform];
+      const map = new Map();
+      if (!platformData || !platformData.summary) return map;
+      platformData.summary.forEach(row => {
+        const owner = row.cells[0];
+        const key = canonicalOwner(owner);
+        const existing = map.get(key) || { owner: key, total: 0, scoreTotal: 0, level: "-" };
+        const total = Number(row.cells[1]) || 0;
+        const score = Number(row.cells[12]) || 0;
+        existing.total += total;
+        existing.scoreTotal += score * total;
+        existing.score = existing.total ? existing.scoreTotal / existing.total : score;
+        existing.level = row.cells[13] || existing.level;
+        map.set(key, {
+          owner: key,
+          total: existing.total,
+          scoreTotal: existing.scoreTotal,
+          score: existing.score,
+          level: existing.level
+        });
+      });
+      return map;
+    }
+
+    function comprehensiveTimeRiskMap() {
+      const aliMap = timeRiskMapForPlatform("ali");
+      const micMap = timeRiskMapForPlatform("mic");
+      const owners = new Set([...aliMap.keys(), ...micMap.keys()]);
+      const result = new Map();
+      owners.forEach(owner => {
+        const key = canonicalOwner(owner);
+        const ali = aliMap.get(key);
+        const mic = micMap.get(key);
+        const parts = [ali, mic].filter(Boolean);
+        const totalConsult = parts.reduce((acc, item) => acc + item.total, 0);
+        const score = totalConsult
+          ? parts.reduce((acc, item) => acc + item.score * item.total, 0) / totalConsult
+          : parts.reduce((acc, item) => acc + item.score, 0) / Math.max(1, parts.length);
+        result.set(key, {
+          score: Math.round(score),
+          level: judgeCompositeTimeRiskLevel(score),
+          aliScore: ali ? Math.round(ali.score) : "-",
+          micScore: mic ? Math.round(mic.score) : "-",
+          totalConsult
+        });
+      });
+      return result;
+    }
+
+    function judgeCompositeTimeRiskLevel(score) {
+      if (score >= 60) return "高";
+      if (score >= 35) return "中";
+      return "低";
+    }
+
+    function importantRiskWeight(priority) {
+      return IMPORTANT_CUSTOMER_RISK_WEIGHTS[priority] ?? 1;
+    }
+
+    function importanceStructure(g) {
+      return `P0:${g.P0 || 0} / P1:${g.P1 || 0} / P2:${g.P2 || 0} / P3:${g.P3 || 0}`;
+    }
+
+    function clampScore(value, min = 0, max = 100) {
+      const num = Number(value);
+      if (!Number.isFinite(num)) return 0;
+      return Math.max(min, Math.min(max, num));
+    }
+
+    function roundOne(value) {
+      const num = Number(value);
+      return Number.isFinite(num) ? Math.round(num * 10) / 10 : "-";
+    }
+
+    function aliReviewTask(row) {
+      return {
+        ...row,
+        reviewPlatform: "阿里国际站",
+        platformLabel: "阿里国际站",
+        taskName: row.inquiryNo || row.customerName || "-",
+        displayNeed: row.buyerFeatures || row.reason || "",
+        displayReply: row.followStatus || "",
+        sourceRow: row
+      };
+    }
+
+    function micReviewTask(row) {
+      return {
+        ...row,
+        reviewPlatform: "中国制造网",
+        platformLabel: "中国制造网",
+        inquiryNo: row.subject || row.id,
+        buyerLevel: row.demand,
+        followStatus: row.action,
+        reason: micReasonForDisplay(row),
+        taskName: row.subject || row.customerName || "-",
+        displayNeed: row.customerNeed || "",
+        displayReply: row.replyContent || "",
+        sourceRow: row
+      };
+    }
+
+    function buildReviewTasks() {
+      const aliTasks = qualityState.current ? qualityState.current.records.map(aliReviewTask) : [];
+      const micTasks = micQualityState.current ? micQualityState.current.records.map(micReviewTask) : [];
+      return [...aliTasks, ...micTasks].sort((a, b) => {
+        const order = { P0: 0, P1: 1, P2: 2, P3: 3 };
+        return order[a.priority] - order[b.priority]
+          || String(a.platformLabel).localeCompare(String(b.platformLabel), "zh-Hans-CN")
+          || String(a.owner).localeCompare(String(b.owner), "zh-Hans-CN");
+      });
+    }
+
+    function buildReviewSummary() {
+      const reviewTasks = buildReviewTasks();
+      if (!reviewTasks.length) return [];
+      const ownerMap = new Map();
+      reviewTasks.forEach(row => {
+        const owner = canonicalOwner(row.owner);
+        if (!ownerMap.has(owner)) {
+          ownerMap.set(owner, {
+            owner, reviewed: 0, pass: 0, issue: 0, serious: 0, totalScore: 0,
+            opportunityCount: 0, importantRiskTotal: 0, P0: 0, P1: 0, P2: 0, P3: 0
+          });
+        }
+        const g = ownerMap.get(owner);
+        g.opportunityCount += 1;
+        if (g[row.priority] !== undefined) g[row.priority] += 1;
+        const score = scoreNumber(row);
+        if (score === null) return;
+        g.reviewed += 1;
+        g.totalScore += score;
+        g.importantRiskTotal += score * importantRiskWeight(row.priority);
+        if (score === 0) g.pass += 1;
+        if (score > 0) g.issue += 1;
+        if (score === 3) g.serious += 1;
+      });
+      const timeMap = comprehensiveTimeRiskMap();
+      return Array.from(ownerMap.values()).map(g => {
+        const avg = g.reviewed ? g.totalScore / g.reviewed : "-";
+        const issueRate = g.reviewed ? g.issue / g.reviewed : "-";
+        const seriousRate = g.reviewed ? g.serious / g.reviewed : "-";
+        const time = timeMap.get(canonicalOwner(g.owner)) || { aliScore: "-", micScore: "-", score: "-", level: "-" };
+        const timeStandardScore = time.score === "-" ? 0 : clampScore(time.score);
+        const weightedHumanRiskScore = g.reviewed ? clampScore((g.importantRiskTotal / g.reviewed) / 4.5 * 100) : "-";
+        const finalScore = g.reviewed
+          ? clampScore(timeStandardScore * 0.40 + weightedHumanRiskScore * 0.60)
+          : "-";
+        const judged = judgeFinalRisk(g.reviewed, avg, g.serious, finalScore);
+        return {
+          owner: g.owner,
+          reviewed: g.reviewed,
+          issue: g.issue,
+          serious: g.serious,
+          level: judged.level,
+          exportCells: [
+            g.owner, g.reviewed, importanceStructure(g), g.totalScore, roundOne(avg),
+            roundOne(weightedHumanRiskScore), roundOne(timeStandardScore), roundOne(finalScore),
+            judged.level, judged.hint, issueRate, seriousRate, g.serious
+          ],
+          cells: [
+            g.owner, g.reviewed, importanceStructure(g), roundOne(avg),
+            roundOne(weightedHumanRiskScore), roundOne(timeStandardScore), roundOne(finalScore),
+            judged.level, judged.hint, issueRate, seriousRate, g.serious
+          ]
+        };
+      });
+    }
+
+    function judgeFinalRisk(reviewed, avg, seriousCount, finalScore) {
+      if (reviewed === 0) return { level: "无复核样本", hint: "本周期不评价" };
+      if (reviewed < 5) {
+        if (seriousCount >= 1) return { level: "样本不足，仅观察", hint: "有严重问题，需复查" };
+        if (avg >= 1) return { level: "样本不足，仅观察", hint: "样本不足，需继续观察" };
+        return { level: "样本不足，仅观察", hint: "仅观察" };
+      }
+      if (finalScore >= 75) return { level: "严重风险", hint: "建议立即复盘回复质量和接待权限" };
+      if (finalScore >= 50) return { level: "高风险", hint: "重点复查聊天记录，限制高价值商机风险" };
+      if (finalScore >= 25) return { level: "中风险", hint: "提醒优化，持续跟踪" };
+      return { level: "低风险", hint: "正常观察" };
+    }
+
+    function renderReviewModule() {
+      const rows = buildReviewSummary();
+      const hasReviewTasks = buildReviewTasks().length > 0;
+      if (!hasReviewTasks) {
+        reviewMetricsEl.innerHTML = "";
+        reviewSummaryEl.className = "empty";
+        reviewSummaryEl.textContent = "完成复核打分后显示汇总结果";
+        reviewSummaryHint.textContent = "暂无数据";
+        reviewStatusEl.textContent = "等待回复质量复核数据";
+        updateExportButton();
+        return;
+      }
+      const reviewed = rows.reduce((acc, row) => acc + row.reviewed, 0);
+      const issue = rows.reduce((acc, row) => acc + row.issue, 0);
+      const serious = rows.reduce((acc, row) => acc + row.serious, 0);
+      const insufficient = rows.filter(row => row.level === "样本不足，仅观察").length;
+      const highOrSerious = rows.filter(row => row.level === "高风险" || row.level === "严重风险").length;
+      const metrics = [
+        { label: "业务员数", value: rows.length, exportValue: rows.length },
+        { label: "已复核商机数", value: reviewed, exportValue: reviewed },
+        { label: "问题商机数", value: issue, exportValue: issue },
+        { label: "严重问题数", value: serious, exportValue: serious },
+        { label: "样本不足业务员", value: insufficient, exportValue: insufficient },
+        { label: "高/严重风险业务员", value: highOrSerious, exportValue: highOrSerious }
+      ];
+      reviewMetricsEl.innerHTML = metrics.map(item => {
+        const tone = item.label.includes("严重") || item.label.includes("高/严重") ? (item.exportValue > 0 ? "danger" : "good")
+          : item.label.includes("问题") || item.label.includes("样本不足") ? "warn"
+          : "neutral";
+        return `
+          <div class="metric ${tone}">
+            <span>${escapeHtml(item.label)}</span>
+            <b>${escapeHtml(item.value)}</b>
+            <div class="metric-bar"><i style="--pct:${Math.min(100, item.exportValue * 10)}%"></i></div>
+          </div>
+        `;
+      }).join("");
+      reviewSummaryHint.textContent = `${rows.length} 位业务员，${reviewed} 条已复核`;
+      reviewStatusEl.textContent = reviewed ? `已汇总 ${reviewed} 条人工复核打分` : "请先在回复质量风险明细中进行人工评分";
+      renderTable(reviewSummaryEl, QUALITY_CONFIG.reviewHeaders, rows, row => {
+        return row.cells.map((cell, index) => formatReviewCell(cell, QUALITY_CONFIG.reviewHeaders[index]));
+      }, "暂无人工复核打分数据", null, row => {
+        if (row.level === "严重风险" || row.level === "高风险") return "row-danger";
+        if (row.level === "中风险" || row.level === "样本不足，仅观察") return "row-warn";
+        return "";
+      });
+      updateExportButton();
+    }
+
+    function formatReviewCell(value, header) {
+      if (value === "-") return escapeHtml(value);
+      if (header.includes("率") && value !== "-") return percent(value);
+      if (header.includes("等级")) return qualityLevelBadge(value);
+      return coloredNumber(value, header);
+    }
+
+    function qualityLevelBadge(level) {
+      let cls = "low";
+      if (String(level).includes("严重") || String(level).includes("高")) cls = "high";
+      else if (String(level).includes("中") || String(level).includes("样本不足")) cls = "mid";
+      else if (String(level).includes("无复核")) cls = "tag-gray";
+      if (cls === "tag-gray") return `<span class="tag tag-gray">${escapeHtml(level)}</span>`;
+      return `<span class="badge ${cls}">${escapeHtml(level)}</span>`;
+    }
+
+    function ownerFilterOptions() {
+      const selected = ownerFilterState[activePlatform] || "";
+      if (!current || !current.abnormal.length) return `<option value="">全部</option>`;
+      const owners = Array.from(new Set(current.abnormal.map(row => row.owner || "未填写负责人"))).sort((a, b) => a.localeCompare(b, "zh-Hans-CN"));
+      if (selected && !owners.includes(selected)) ownerFilterState[activePlatform] = "";
+      return `<option value="">全部</option>` + owners.map(owner => {
+        const picked = owner === ownerFilterState[activePlatform] ? " selected" : "";
+        return `<option value="${escapeHtml(owner)}"${picked}>${escapeHtml(owner)}</option>`;
+      }).join("");
+    }
+
+    function renderMetrics(metrics) {
+      metricsEl.innerHTML = metrics.map(item => `
+        <div class="metric">
+          <span>${escapeHtml(item.label)}</span>
+          <b>${escapeHtml(item.value)}</b>
+        </div>
+      `).join("");
+    }
+
+    function levelBadge(level) {
+      const cls = level === "高" ? "high" : level === "中" ? "mid" : "low";
+      return `<span class="badge ${cls}">${escapeHtml(level)}</span>`;
+    }
+
+    function formatCellForUi(value, header) {
+      if (header.includes("率")) return percent(value);
+      if (header === "风险等级") return levelBadge(value);
+      return escapeHtml(value);
+    }
+
+    function renderTable(target, headers, rows, mapper, emptyText, headerMapper = null, rowClassMapper = null) {
+      if (!rows.length) {
+        target.className = "empty";
+        target.innerHTML = emptyText;
+        return;
+      }
+      target.className = "table-wrap";
+      const body = rows.map(row => `<tr class="${rowClassMapper ? rowClassMapper(row) : ""}">${mapper(row).map((cell, index) => {
+        const cls = headers[index] && headers[index].includes("风险标签") ? " class=\"risk-tag-cell\"" : "";
+        return `<td${cls}>${cell}</td>`;
+      }).join("")}</tr>`).join("");
+      target.innerHTML = `
+        <table>
+          <thead><tr>${headers.map((h, index) => `<th>${headerMapper ? headerMapper(h, index) : escapeHtml(h)}</th>`).join("")}</tr></thead>
+          <tbody>${body}</tbody>
+        </table>
+      `;
+    }
+
+    function renderSummary(summary) {
+      const cfg = PLATFORM_CONFIG[current.platform];
+      summaryHint.textContent = `${summary.length} 位业务员`;
+      renderTable(summaryEl, cfg.summaryHeaders, summary, row => row.cells.map((cell, index) => formatCellForUi(cell, cfg.summaryHeaders[index])), "没有可汇总的数据");
+    }
+
+    function renderDetails(details) {
+      const cfg = PLATFORM_CONFIG[current.platform];
+      detailHint.textContent = `${details.length} 条有风险标签的记录`;
+      renderTable(detailEl, cfg.detailHeaders, details, row => detailRow(row, current.platform).map(escapeHtml), "当前文件没有风险标签记录");
+    }
+
+    function metricTone(item) {
+      const label = item.label || "";
+      const value = Number(item.exportValue);
+      if (label.includes("总咨询") || label.includes("高风险业务员")) return "neutral";
+      if (label.includes("及时率")) return value >= 0.95 ? "good" : value >= 0.8 ? "warn" : "danger";
+      if (label.includes("极速率")) return value >= 0.85 ? "good" : value >= 0.7 ? "warn" : "danger";
+      if (label.includes("人工极速率")) return value >= 0.5 ? "good" : value >= 0.35 ? "warn" : "danger";
+      if (label.includes("严重") || label.includes("超24") || label.includes("高风险")) return value > 0 ? "danger" : "good";
+      if (label.includes("非工作") || label.includes("超4") || label.includes("超1")) return value > 0 ? "warn" : "good";
+      return "neutral";
+    }
+
+    function metricSubtext(item) {
+      if (!current || !current.records.length) return "";
+      const total = current.records.length;
+      const value = Number(item.exportValue);
+      if (item.label.includes("率")) {
+        const count = Math.round(value * total);
+        return `${count}/${total}`;
+      }
+      if (Number.isFinite(value) && total && value > 0 && !item.label.includes("总咨询")) {
+        return `${Math.round(value / total * 100)}%`;
+      }
+      return "";
+    }
+
+    function metricProgress(item) {
+      const label = item.label || "";
+      const value = Number(item.exportValue);
+      if (!Number.isFinite(value)) return 0;
+      if (label.includes("率")) return Math.max(0, Math.min(100, value * 100));
+      if (!current || !current.records.length || label.includes("总咨询")) return 0;
+      return Math.max(0, Math.min(100, value / current.records.length * 100));
+    }
+
+    function renderMetrics(metrics) {
+      metricsEl.innerHTML = metrics.map(item => `
+        <div class="metric ${metricTone(item)}">
+          <span>${escapeHtml(item.label)}</span>
+          <b>${escapeHtml(item.value)}</b>
+          ${metricSubtext(item) ? `<small>${escapeHtml(metricSubtext(item))}</small>` : ""}
+          <div class="metric-bar"><i style="--pct:${metricProgress(item)}%"></i></div>
+        </div>
+      `).join("");
+    }
+
+    function renderCharts() {
+      if (!current || !current.records.length) {
+        chartsEl.innerHTML = "";
+        return;
+      }
+      const total = current.records.length;
+      const sum = key => current.records.reduce((acc, row) => acc + (row[key] || 0), 0);
+      const fastRate = safeDivide(sum("fast"), total);
+      const secondRate = current.platform === "mic" ? safeDivide(sum("timely"), total) : safeDivide(sum("human"), total);
+      const riskRate = safeDivide(current.abnormal.length, total);
+      const dist = riskDistribution();
+      chartsEl.innerHTML = [
+        ringCard(current.platform === "mic" ? "4小时极速率" : "极速回复率", fastRate, "#52c41a"),
+        ringCard(current.platform === "mic" ? "24小时及时率" : "人工极速率", secondRate, "#1677ff"),
+        ringCard("异常记录占比", riskRate, riskRate > .35 ? "#f5222d" : riskRate > .18 ? "#fa8c16" : "#52c41a"),
+        distCard(dist)
+      ].join("");
+    }
+
+    function ringCard(title, rate, color) {
+      const pct = Math.round((rate || 0) * 1000) / 10;
+      return `
+        <div class="chart-card">
+          <div class="chart-title">${escapeHtml(title)}</div>
+          <div class="ring" style="--ring-value:${pct}%;--ring-color:${color}">
+            <strong>${pct}%</strong>
+          </div>
+        </div>
+      `;
+    }
+
+    function riskDistribution() {
+      const result = { "低": 0, "中": 0, "高": 0 };
+      current.summary.forEach(row => {
+        const level = row.level || row.cells[row.cells.length - (current.platform === "mic" ? 2 : 1)];
+        if (result[level] !== undefined) result[level] += 1;
+      });
+      return result;
+    }
+
+    function distCard(dist) {
+      const total = Math.max(1, Object.values(dist).reduce((a, b) => a + b, 0));
+      const rows = [
+        ["低风险", dist["低"] || 0, "#52c41a"],
+        ["中风险", dist["中"] || 0, "#fa8c16"],
+        ["高风险", dist["高"] || 0, "#f5222d"]
+      ];
+      return `
+        <div class="chart-card">
+          <div class="chart-title">业务员风险等级分布</div>
+          <div class="dist-list">
+            ${rows.map(([label, value, color]) => `
+              <div class="dist-row">
+                <span>${label}</span>
+                <div class="dist-track"><i style="--pct:${value / total * 100}%;--bar-color:${color}"></i></div>
+                <b>${value}</b>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+      `;
+    }
+
+    function levelBadge(level) {
+      const cls = level === "高" ? "high" : level === "中" ? "mid" : "low";
+      return `<span class="badge ${cls}">${escapeHtml(level)}</span>`;
+    }
+
+    function tagTone(text) {
+      if (text.includes("超24") || text.includes("严重")) return "tag-red";
+      if (text.includes("超4")) return "tag-orange";
+      if (text.includes("超1")) return "tag-yellow";
+      if (text.includes("非工作")) return "tag-blue";
+      if (text.includes("非人工")) return "tag-purple";
+      return "tag-green";
+    }
+
+    function riskTags(value) {
+      const parts = String(value || "")
+        .split(/[；，,;]/)
+        .map(s => s.trim())
+        .filter(Boolean);
+      if (!parts.length) return "";
+      return parts.map(part => `<span class="tag ${tagTone(part)}">${escapeHtml(part)}</span>`).join("");
+    }
+
+    function ynBadge(value) {
+      const text = String(value ?? "").trim().toUpperCase();
+      if (text === "Y" || text === "是") return `<span class="yn y">${escapeHtml(value)}</span>`;
+      if (text === "N" || text === "否") return `<span class="yn n">${escapeHtml(value)}</span>`;
+      return escapeHtml(value);
+    }
+
+    function coloredNumber(value, header) {
+      const num = Number(value);
+      if (!Number.isFinite(num)) return escapeHtml(value);
+      if (header.includes("风险分") && num >= 60) return `<span class="num-danger">${escapeHtml(value)}</span>`;
+      if (header.includes("风险分") && num >= 35) return `<span class="num-warn">${escapeHtml(value)}</span>`;
+      if ((header.includes("超") || header.includes("未极速") || header.includes("延迟")) && num > 0) return `<span class="num-warn">${escapeHtml(value)}</span>`;
+      return escapeHtml(value);
+    }
+
+    function formatCellForUi(value, header) {
+      if (header.includes("率")) return percent(value);
+      if (header === "风险等级") return levelBadge(value);
+      if (header.includes("风险标签")) return riskTags(value);
+      if (header.includes("是否")) return ynBadge(value);
+      return coloredNumber(value, header);
+    }
+
+    function renderDetails(details) {
+      const cfg = PLATFORM_CONFIG[current.platform];
+      const owner = ownerFilterState[current.platform] || "";
+      const filtered = owner ? details.filter(row => (row.owner || "未填写负责人") === owner) : details;
+      detailHint.textContent = owner
+        ? `${filtered.length} / ${details.length} 条异常，负责人：${owner}`
+        : `${details.length} 条有风险标签的记录`;
+      const ownerCol = current.platform === "mic" ? 9 : 7;
+      renderTable(detailEl, cfg.detailHeaders, filtered, row => {
+        const cells = detailRow(row, current.platform);
+        return cells.map((cell, index) => formatCellForUi(cell, cfg.detailHeaders[index]));
+      }, "当前文件没有风险标签记录", (header, index) => {
+        if (index !== ownerCol) return escapeHtml(header);
+        return `
+          <span class="th-owner-filter">
+            <span>${escapeHtml(header)}</span>
+            <select id="ownerFilterInline">
+              ${ownerFilterOptions()}
+            </select>
+          </span>
+        `;
+      }, detailRowClass);
+      const filter = document.getElementById("ownerFilterInline");
+      if (filter) {
+        filter.addEventListener("change", () => {
+          ownerFilterState[current.platform] = filter.value;
+          renderDetails(current.abnormal);
+        });
+      }
+    }
+
+    function detailRowClass(row) {
+      if (row.severe || row.riskScore >= 60) return "row-danger";
+      if (row.overFast || row.overOne || row.riskScore >= 35) return "row-warn";
+      if (row.nonWorkUnfast || row.fastNonHuman) return "row-info";
+      return "";
+    }
+
+    function aliRawRow(r) {
+      return [
+        r.seq, r.customer, r.sendPstRaw, r.replyPstRaw, r.replyHours, r.fastRaw, r.humanRaw, r.owner,
+        formatDateTime(r.beijingSend), r.weekDay, r.consultPeriod, r.nonWork, r.fast, r.human,
+        r.nonWorkUnfast, r.fastNonHuman, r.overOne, r.severe, r.riskScore, r.riskLabel
+      ];
+    }
+
+    function micRawRow(r) {
+      return [
+        r.source, r.senderId, r.senderName, formatDateTime(r.sendTime), r.owner, r.replyAccount,
+        formatDateTime(r.firstReply), r.timelyRaw, r.assignTime, formatDateTime(r.sendTime),
+        roundedHours(r.replyHours), r.fastRaw, r.timelyRaw, r.consultPeriod, r.nonWork,
+        r.nonWorkUnfast, r.overOne, r.overFast, r.severe, r.riskLabel, r.riskScore
+      ];
+    }
+
+    function detailRow(r, platform) {
+      if (platform === "mic") {
+        return [
+          r.seq, r.source, r.senderId, r.senderName, formatDateTime(r.sendTime),
+          formatDateTime(r.firstReply), roundedHours(r.replyHours), r.fastRaw,
+          r.timelyRaw, r.owner, r.riskLabel
+        ];
+      }
+      return [
+        r.seq, r.customer, formatDateTime(r.beijingSend), formatDateTime(r.replyBeijing),
+        r.replyHours, r.fastRaw, r.humanRaw, r.owner, r.riskLabel, r.riskScore
+      ];
+    }
+
+    function rawSheetRows() {
+      const cfg = PLATFORM_CONFIG[current.platform];
+      const mapper = current.platform === "mic" ? micRawRow : aliRawRow;
+      return [cfg.rawHeaders, ...current.records.map(mapper)];
+    }
+
+    function summarySheetRows() {
+      const cfg = PLATFORM_CONFIG[current.platform];
+      const title = `${cfg.name}业务员接待风险汇总`;
+      const rows = [[title], [], cfg.summaryHeaders, ...current.summary.map(r => r.cells)];
+      rows[2][cfg.summaryHeaders.length + 1] = "本周关键指标";
+      current.metrics.forEach((metric, index) => {
+        const rowIndex = 3 + index;
+        if (!rows[rowIndex]) rows[rowIndex] = [];
+        rows[rowIndex][cfg.summaryHeaders.length + 1] = metric.label;
+        rows[rowIndex][cfg.summaryHeaders.length + 2] = metric.exportValue;
+      });
+      return rows;
+    }
+
+    function detailSheetRows() {
+      const cfg = PLATFORM_CONFIG[current.platform];
+      return [cfg.detailHeaders, ...current.abnormal.map(row => detailRow(row, current.platform))];
+    }
+
+    function metricSheetRows() {
+      return [["本周关键指标", "结果"], ...current.metrics.map(m => [m.label, m.exportValue])];
+    }
+
+    function qualityScoreLabel(value) {
+      const labels = { "0": "合格", "1": "轻微问题", "2": "一般问题", "3": "严重问题" };
+      return labels[String(value)] || "";
+    }
+
+    function qualityDetailRowsForExport() {
+      const headers = qualityDetailExportHeaders();
+      if (!qualityState.current) return [headers];
+      return [
+        headers,
+        ...qualityState.current.records.map(row => {
+          const info = scoreInfo(row);
+          const score = info.score === "" || info.score === undefined ? "" : String(info.score);
+          return [
+            row.seq, row.priority, row.owner, row.inquiryNo, row.customerName, row.country,
+            row.buyerLevel, row.highIntent, row.buyerFeatures, row.followStatus, row.reason,
+            score === "" ? "" : `${qualityScoreLabel(score)} ${score}分`,
+            score,
+            info.note || ""
+          ];
+        })
+      ];
+    }
+
+    function qualityDetailExportHeaders() {
+      return ["序号", "优先级", "业务员", "询盘单号", "客户名", "国家", "客户等级", "高意向", "买家特征", "跟进状态", "复核原因", "人工复核结果", "单条风险分", "人工备注"];
+    }
+
+    function qualityRawRowsForExport() {
+      if (!qualityState.current) return [QUALITY_CONFIG.rawHeaders];
+      return [
+        QUALITY_CONFIG.rawHeaders,
+        ...qualityState.current.records.map(row => {
+          const info = scoreInfo(row);
+          return [
+            row.seq, row.createdAt, row.updatedAt, row.owner, row.inquiryNo, row.source, row.category,
+            row.port, row.highIntent, row.buyerLevel, row.customerId, row.customerName, row.email,
+            row.country, row.company, row.registeredAt, row.buyerTags, row.buyerFeatures,
+            row.followStatus, row.login90, row.productViews90, row.inquiries90, row.rfq90,
+            row.orderCount, row.orderAmount, row.priority, row.reason,
+            info.score === "" || info.score === undefined ? "" : info.score,
+            info.note || ""
+          ];
+        })
+      ];
+    }
+
+    function qualitySummaryRowsForExport() {
+      if (!qualityState.current) return [QUALITY_CONFIG.summaryHeaders];
+      return [
+        ["回复质量风险业务员汇总"],
+        [],
+        QUALITY_CONFIG.summaryHeaders,
+        ...qualityState.current.summary.map(row => row.cells)
+      ];
+    }
+
+    function reviewSummaryRowsForExport() {
+      return [
+        ["人工复核与最终评估"],
+        [],
+        QUALITY_CONFIG.reviewExportHeaders,
+        ...buildReviewSummary().map(row => row.exportCells)
+      ];
+    }
+
+    function reviewPoolRowsForExport() {
+      const headers = ["平台", "优先级", "业务员", "客户/商机", "国家", "复核原因", "客户原始需求", "业务员回复内容", "人工复核结果", "单条风险分", "人工备注"];
+      return [
+        headers,
+        ...buildReviewTasks().map(row => {
+          const info = scoreInfo(row);
+          const score = info.score === "" || info.score === undefined ? "" : String(info.score);
+          return [
+            row.platformLabel, row.priority, canonicalOwner(row.owner), row.taskName || row.customerName || "-",
+            row.country || "-", row.reason || "-", row.displayNeed || "", row.displayReply || "",
+            score === "" ? "" : `${qualityScoreLabel(score)} ${score}分`,
+            score,
+            info.note || ""
+          ];
+        })
+      ];
+    }
+
+    function qualityMetricRowsForExport() {
+      if (!qualityState.current) return [["本周关键指标", "结果"]];
+      return [["本周关键指标", "结果"], ...qualityState.current.metrics.map(m => [m.label, m.exportValue])];
+    }
+
+    function exportQualityWorkbook() {
+      if (!qualityState.current || !window.XLSX) return;
+      const wb = XLSX.utils.book_new();
+      const summaryWs = XLSX.utils.aoa_to_sheet(qualitySummaryRowsForExport());
+      const detailWs = XLSX.utils.aoa_to_sheet(qualityDetailRowsForExport());
+      const reviewWs = XLSX.utils.aoa_to_sheet(reviewSummaryRowsForExport());
+      const metricWs = XLSX.utils.aoa_to_sheet(qualityMetricRowsForExport());
+      const rawWs = XLSX.utils.aoa_to_sheet(qualityRawRowsForExport());
+
+      summaryWs["!cols"] = QUALITY_CONFIG.summaryHeaders.map(h => ({ wch: Math.max(12, Math.min(24, h.length + 8)) }));
+      detailWs["!cols"] = qualityDetailExportHeaders().map(h => ({ wch: Math.max(12, Math.min(28, h.length + 10)) }));
+      reviewWs["!cols"] = QUALITY_CONFIG.reviewExportHeaders.map(h => ({ wch: Math.max(12, Math.min(26, h.length + 8)) }));
+      rawWs["!cols"] = QUALITY_CONFIG.rawHeaders.map(h => ({ wch: Math.max(12, Math.min(28, h.length + 8)) }));
+
+      XLSX.utils.book_append_sheet(wb, summaryWs, "业务员汇总");
+      XLSX.utils.book_append_sheet(wb, detailWs, "复核清单");
+      XLSX.utils.book_append_sheet(wb, reviewWs, "人工复核汇总");
+      XLSX.utils.book_append_sheet(wb, metricWs, "本周关键指标");
+      XLSX.utils.book_append_sheet(wb, rawWs, "原始数据");
+      XLSX.writeFile(wb, QUALITY_CONFIG.exportName);
+    }
+
+    function exportReviewWorkbook() {
+      if ((!qualityState.current && !micQualityState.current) || !window.XLSX) return;
+      const wb = XLSX.utils.book_new();
+      const reviewWs = XLSX.utils.aoa_to_sheet(reviewSummaryRowsForExport());
+      const detailWs = XLSX.utils.aoa_to_sheet(reviewPoolRowsForExport());
+      reviewWs["!cols"] = QUALITY_CONFIG.reviewExportHeaders.map(h => ({ wch: Math.max(12, Math.min(26, h.length + 8)) }));
+      detailWs["!cols"] = reviewPoolRowsForExport()[0].map(h => ({ wch: Math.max(12, Math.min(28, h.length + 10)) }));
+      XLSX.utils.book_append_sheet(wb, reviewWs, "人工复核汇总");
+      XLSX.utils.book_append_sheet(wb, detailWs, "复核结果明细");
+      XLSX.writeFile(wb, "人工复核与最终评估.xlsx");
+    }
+
+    function exportTimeWorkbook() {
+      if (!current || !window.XLSX) return;
+      const cfg = PLATFORM_CONFIG[current.platform];
+      const wb = XLSX.utils.book_new();
+      const summaryWs = XLSX.utils.aoa_to_sheet(summarySheetRows());
+      const detailWs = XLSX.utils.aoa_to_sheet(detailSheetRows());
+      const metricWs = XLSX.utils.aoa_to_sheet(metricSheetRows());
+      const rawWs = XLSX.utils.aoa_to_sheet(rawSheetRows());
+
+      summaryWs["!cols"] = cfg.summaryHeaders.map(h => ({ wch: Math.max(10, Math.min(24, h.length + 6)) }));
+      detailWs["!cols"] = cfg.detailHeaders.map(h => ({ wch: Math.max(10, Math.min(26, h.length + 8)) }));
+      rawWs["!cols"] = cfg.rawHeaders.map(h => ({ wch: Math.max(10, Math.min(26, h.length + 8)) }));
+
+      XLSX.utils.book_append_sheet(wb, summaryWs, "业务员汇总");
+      XLSX.utils.book_append_sheet(wb, detailWs, "异常明细");
+      XLSX.utils.book_append_sheet(wb, metricWs, "本周关键指标");
+      XLSX.utils.book_append_sheet(wb, rawWs, "原始数据");
+      XLSX.writeFile(wb, cfg.exportName);
+    }
+
+    function exportWorkbook() {
+      if (activeModule === "quality") {
+        exportQualityWorkbook();
+        return;
+      }
+      if (activeModule === "review") {
+        exportReviewWorkbook();
+        return;
+      }
+      exportTimeWorkbook();
+    }
+
+    function resetPage() {
+      platformState[activePlatform] = null;
+      ownerFilterState[activePlatform] = "";
+      current = null;
+      fileInput.value = "";
+      metricsEl.innerHTML = "";
+      chartsEl.innerHTML = "";
+      summaryEl.className = "empty";
+      summaryEl.textContent = "上传文件后显示汇总结果";
+      detailEl.className = "empty";
+      detailEl.textContent = "上传文件后显示异常记录";
+      summaryHint.textContent = "暂无数据";
+      detailHint.textContent = "只显示有风险标签的记录";
+      clearBtn.disabled = true;
+      setStatus("等待上传文件");
+      refreshFinalReviewSummary();
+      updateExportButton();
+    }
+
+    function resetQualityPage() {
+      qualityState.current = null;
+      qualityState.priorityFilter = "";
+      priorityFilter.value = "";
+      qualityFileInput.value = "";
+      qualityMetricsEl.innerHTML = "";
+      qualityChartsEl.innerHTML = "";
+      qualitySummaryEl.className = "empty";
+      qualitySummaryEl.textContent = "上传文件后显示汇总结果";
+      qualityDetailEl.className = "empty";
+      qualityDetailEl.textContent = "上传文件后显示复核清单";
+      qualitySummaryHint.textContent = "暂无数据";
+      qualityDetailHint.textContent = "默认显示全部优先级";
+      qualityClearBtn.disabled = true;
+      setQualityStatus("等待上传询盘中心报表");
+      renderReviewModule();
+      updateExportButton();
+    }
+
+    function resetMicQualityPage() {
+      micQualityState.current = null;
+      micQualityState.priorityFilter = "review";
+      micQualityState.openDetail = "";
+      micPriorityFilter.value = "review";
+      micQualityFileInput.value = "";
+      micQualityMetricsEl.innerHTML = "";
+      micQualityOwnerSummaryTable.className = "empty";
+      micQualityOwnerSummaryTable.textContent = "上传文件后显示业务员优先级汇总";
+      micQualityOwnerSummaryHint.textContent = "暂无数据";
+      micQualityTable.className = "empty";
+      micQualityTable.textContent = "上传文件后显示中国制造网复核任务";
+      micQualityDetailHint.textContent = "默认显示 P0+P1 待复核任务";
+      micQualityClearBtn.disabled = true;
+      setMicQualityStatus("等待上传中国制造网原始数据");
+    }
+  </script>
+</body>
+</html>
