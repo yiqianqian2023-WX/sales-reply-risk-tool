@@ -1352,6 +1352,29 @@
       ];
     }
 
+    function hourText(value) {
+      const num = Number(value);
+      if (!Number.isFinite(num)) return String(value ?? "");
+      return Number.isInteger(num) ? String(num) : String(num).replace(/\.0+$/, "");
+    }
+
+    function micFastHourText() {
+      return `${hourText(PLATFORM_CONFIG.mic.settings.fastHours)}小时`;
+    }
+
+    function replaceMicFastLabel(text) {
+      const fast = micFastHourText();
+      return String(text)
+        .replaceAll("4小时极速", `${fast}极速`)
+        .replaceAll("超4小时未极速", `超${fast}未极速`);
+    }
+
+    function timeHeaders(platform, key) {
+      const headers = PLATFORM_CONFIG[platform][key];
+      if (platform !== "mic") return headers;
+      return headers.map(replaceMicFastLabel);
+    }
+
     function saveRules() {
       const cfg = PLATFORM_CONFIG[activePlatform];
       const next = { ...cfg.settings };
@@ -1885,7 +1908,7 @@
         const overOne = replyHours !== "" && replyHours >= s.overOne ? 1 : 0;
         const overFast = replyHours !== "" && replyHours > s.fastHours ? 1 : 0;
         const severe = replyHours !== "" && (replyHours >= s.severe || timely === 0) ? 1 : 0;
-        const riskLabel = `${nonWorkUnfast ? "非工作未极速，" : ""}${overFast ? "超4小时未极速，" : ""}${overOne ? "超1小时，" : ""}${severe ? "超24小时未及时，" : ""}`;
+        const riskLabel = `${nonWorkUnfast ? "非工作未极速，" : ""}${overFast ? `超${hourText(s.fastHours)}小时未极速，` : ""}${overOne ? "超1小时，" : ""}${severe ? "超24小时未及时，" : ""}`;
         const riskScore = nonWorkUnfast * 25 + overFast * 25 + overOne * 10 + severe * 40;
 
         return {
@@ -2012,13 +2035,14 @@
       const sum = key => records.reduce((acc, row) => acc + (row[key] || 0), 0);
       if (platform === "mic") {
         const highCount = summary.filter(r => r.level === "高").length;
+        const fast = micFastHourText();
         return [
           { label: "总咨询数", value: total, exportValue: total },
-          { label: "4小时极速率", value: percent(safeDivide(sum("fast"), total)), exportValue: safeDivide(sum("fast"), total) },
+          { label: `${fast}极速率`, value: percent(safeDivide(sum("fast"), total)), exportValue: safeDivide(sum("fast"), total) },
           { label: "24小时及时率", value: percent(safeDivide(sum("timely"), total)), exportValue: safeDivide(sum("timely"), total) },
           { label: "非工作咨询数", value: sum("nonWork"), exportValue: sum("nonWork") },
           { label: "非工作未极速数", value: sum("nonWorkUnfast"), exportValue: sum("nonWorkUnfast") },
-          { label: "超4小时未极速数", value: sum("overFast"), exportValue: sum("overFast") },
+          { label: `超${fast}未极速数`, value: sum("overFast"), exportValue: sum("overFast") },
           { label: "超24小时未及时数", value: sum("severe"), exportValue: sum("severe") },
           { label: "高风险业务员数", value: highCount, exportValue: highCount }
         ];
@@ -3249,15 +3273,15 @@
     }
 
     function renderSummary(summary) {
-      const cfg = PLATFORM_CONFIG[current.platform];
+      const headers = timeHeaders(current.platform, "summaryHeaders");
       summaryHint.textContent = `${summary.length} 位业务员`;
-      renderTable(summaryEl, cfg.summaryHeaders, summary, row => row.cells.map((cell, index) => formatCellForUi(cell, cfg.summaryHeaders[index])), "没有可汇总的数据");
+      renderTable(summaryEl, headers, summary, row => row.cells.map((cell, index) => formatCellForUi(cell, headers[index])), "没有可汇总的数据");
     }
 
     function renderDetails(details) {
-      const cfg = PLATFORM_CONFIG[current.platform];
+      const headers = timeHeaders(current.platform, "detailHeaders");
       detailHint.textContent = `${details.length} 条有风险标签的记录`;
-      renderTable(detailEl, cfg.detailHeaders, details, row => detailRow(row, current.platform).map(escapeHtml), "当前文件没有风险标签记录");
+      renderTable(detailEl, headers, details, row => detailRow(row, current.platform).map(escapeHtml), "当前文件没有风险标签记录");
     }
 
     function metricTone(item) {
@@ -3268,7 +3292,7 @@
       if (label.includes("极速率")) return value >= 0.85 ? "good" : value >= 0.7 ? "warn" : "danger";
       if (label.includes("人工极速率")) return value >= 0.5 ? "good" : value >= 0.35 ? "warn" : "danger";
       if (label.includes("严重") || label.includes("超24") || label.includes("高风险")) return value > 0 ? "danger" : "good";
-      if (label.includes("非工作") || label.includes("超4") || label.includes("超1")) return value > 0 ? "warn" : "good";
+      if (label.includes("非工作") || label.includes("未极速") || label.includes("超1")) return value > 0 ? "warn" : "good";
       return "neutral";
     }
 
@@ -3318,7 +3342,7 @@
       const riskRate = safeDivide(current.abnormal.length, total);
       const dist = riskDistribution();
       chartsEl.innerHTML = [
-        ringCard(current.platform === "mic" ? "4小时极速率" : "极速回复率", fastRate, "#52c41a"),
+        ringCard(current.platform === "mic" ? `${micFastHourText()}极速率` : "极速回复率", fastRate, "#52c41a"),
         ringCard(current.platform === "mic" ? "24小时及时率" : "人工极速率", secondRate, "#1677ff"),
         ringCard("异常记录占比", riskRate, riskRate > .35 ? "#f5222d" : riskRate > .18 ? "#fa8c16" : "#52c41a"),
         distCard(dist)
@@ -3376,7 +3400,7 @@
 
     function tagTone(text) {
       if (text.includes("超24") || text.includes("严重")) return "tag-red";
-      if (text.includes("超4")) return "tag-orange";
+      if (text.includes("未极速")) return "tag-orange";
       if (text.includes("超1")) return "tag-yellow";
       if (text.includes("非工作")) return "tag-blue";
       if (text.includes("非人工")) return "tag-purple";
@@ -3417,16 +3441,16 @@
     }
 
     function renderDetails(details) {
-      const cfg = PLATFORM_CONFIG[current.platform];
+      const headers = timeHeaders(current.platform, "detailHeaders");
       const owner = ownerFilterState[current.platform] || "";
       const filtered = owner ? details.filter(row => (row.owner || "未填写负责人") === owner) : details;
       detailHint.textContent = owner
         ? `${filtered.length} / ${details.length} 条异常，负责人：${owner}`
         : `${details.length} 条有风险标签的记录`;
       const ownerCol = current.platform === "mic" ? 9 : 7;
-      renderTable(detailEl, cfg.detailHeaders, filtered, row => {
+      renderTable(detailEl, headers, filtered, row => {
         const cells = detailRow(row, current.platform);
-        return cells.map((cell, index) => formatCellForUi(cell, cfg.detailHeaders[index]));
+        return cells.map((cell, index) => formatCellForUi(cell, headers[index]));
       }, "当前文件没有风险标签记录", (header, index) => {
         if (index !== ownerCol) return escapeHtml(header);
         return `
@@ -3488,26 +3512,26 @@
     function rawSheetRows() {
       const cfg = PLATFORM_CONFIG[current.platform];
       const mapper = current.platform === "mic" ? micRawRow : aliRawRow;
-      return [cfg.rawHeaders, ...current.records.map(mapper)];
+      return [timeHeaders(current.platform, "rawHeaders"), ...current.records.map(mapper)];
     }
 
     function summarySheetRows() {
       const cfg = PLATFORM_CONFIG[current.platform];
+      const headers = timeHeaders(current.platform, "summaryHeaders");
       const title = `${cfg.name}业务员接待风险汇总`;
-      const rows = [[title], [], cfg.summaryHeaders, ...current.summary.map(r => r.cells)];
-      rows[2][cfg.summaryHeaders.length + 1] = "本周关键指标";
+      const rows = [[title], [], headers, ...current.summary.map(r => r.cells)];
+      rows[2][headers.length + 1] = "本周关键指标";
       current.metrics.forEach((metric, index) => {
         const rowIndex = 3 + index;
         if (!rows[rowIndex]) rows[rowIndex] = [];
-        rows[rowIndex][cfg.summaryHeaders.length + 1] = metric.label;
-        rows[rowIndex][cfg.summaryHeaders.length + 2] = metric.exportValue;
+        rows[rowIndex][headers.length + 1] = metric.label;
+        rows[rowIndex][headers.length + 2] = metric.exportValue;
       });
       return rows;
     }
 
     function detailSheetRows() {
-      const cfg = PLATFORM_CONFIG[current.platform];
-      return [cfg.detailHeaders, ...current.abnormal.map(row => detailRow(row, current.platform))];
+      return [timeHeaders(current.platform, "detailHeaders"), ...current.abnormal.map(row => detailRow(row, current.platform))];
     }
 
     function metricSheetRows() {
@@ -3646,9 +3670,9 @@
       const metricWs = XLSX.utils.aoa_to_sheet(metricSheetRows());
       const rawWs = XLSX.utils.aoa_to_sheet(rawSheetRows());
 
-      summaryWs["!cols"] = cfg.summaryHeaders.map(h => ({ wch: Math.max(10, Math.min(24, h.length + 6)) }));
-      detailWs["!cols"] = cfg.detailHeaders.map(h => ({ wch: Math.max(10, Math.min(26, h.length + 8)) }));
-      rawWs["!cols"] = cfg.rawHeaders.map(h => ({ wch: Math.max(10, Math.min(26, h.length + 8)) }));
+      summaryWs["!cols"] = timeHeaders(current.platform, "summaryHeaders").map(h => ({ wch: Math.max(10, Math.min(24, h.length + 6)) }));
+      detailWs["!cols"] = timeHeaders(current.platform, "detailHeaders").map(h => ({ wch: Math.max(10, Math.min(26, h.length + 8)) }));
+      rawWs["!cols"] = timeHeaders(current.platform, "rawHeaders").map(h => ({ wch: Math.max(10, Math.min(26, h.length + 8)) }));
 
       XLSX.utils.book_append_sheet(wb, summaryWs, "业务员汇总");
       XLSX.utils.book_append_sheet(wb, detailWs, "异常明细");
