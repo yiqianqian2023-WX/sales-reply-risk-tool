@@ -829,7 +829,7 @@
             </div>
           </div>
           <div id="ruleGrid" class="rule-grid"></div>
-          <div class="rule-note">本工具用于筛选回复风险记录，最终接待权限调整需结合异常聊天内容抽查确认。</div>
+          <div class="rule-note">本工具用于筛选回复风险记录，最终接待权限调整需结合异常聊天内容抽查确认。非工作时间咨询仅作接待机制观察，不计入个人时间风险分。</div>
         </div>
       </div>
 
@@ -1036,7 +1036,7 @@
         summaryHeaders: [
           "业务员", "总咨询数", "极速回复数", "极速回复率", "人工极速数", "人工极速率",
           "非工作咨询数", "非工作未极速数", "非工作未极速率", "极速但非人工数",
-          "超1小时数", "严重延迟数", "风险分", "风险等级"
+          "超1小时数", "严重延迟数", "工作时间风险分", "风险等级"
         ],
         detailHeaders: [
           "序号", "客户/商机标识", "北京发送时间", "回复时间北京时间", "回复时长小时",
@@ -1087,7 +1087,7 @@
         summaryHeaders: [
           "业务员", "总咨询数", "4小时极速数", "4小时极速率", "24小时及时数", "24小时及时率",
           "非工作咨询数", "非工作未极速数", "非工作未极速率", "超1小时数",
-          "超4小时未极速数", "超24小时未及时数", "风险分", "风险等级", "建议动作"
+          "超4小时未极速数", "超24小时未及时数", "工作时间风险分", "风险等级", "建议动作"
         ],
         detailHeaders: [
           "序号", "来源", "发送方ID", "发送方名字", "发送时间", "首次回复时间",
@@ -1113,12 +1113,12 @@
       ],
       reviewHeaders: [
         "业务员", "复核商机数", "P0/P1/P2/P3结构", "平均人工风险分",
-        "人工复核加权风险分", "时间风险标准分", "最终风险分", "最终风险等级",
+        "人工复核加权风险分", "工作时间风险标准分", "最终风险分", "最终风险等级",
         "风险提示 / 处理建议", "问题率", "严重问题率", "严重问题数"
       ],
       reviewExportHeaders: [
         "业务员", "复核商机数", "P0/P1/P2/P3结构", "总人工风险分", "平均人工风险分",
-        "人工复核加权风险分", "时间风险标准分", "最终风险分", "最终风险等级",
+        "人工复核加权风险分", "工作时间风险标准分", "最终风险分", "最终风险等级",
         "风险提示 / 处理建议", "问题率", "严重问题率", "严重问题数"
       ]
     };
@@ -1945,21 +1945,20 @@
         const fastRate = safeDivide(g.fast, g.total);
         const humanRate = safeDivide(g.human, g.total);
         const nonWorkUnfastRate = safeDivide(g.nonWorkUnfast, g.nonWork);
-        const fastNonHumanRate = safeDivide(g.fastNonHuman, g.total);
-        const overOneRate = safeDivide(g.overOne, g.total);
-        const severeRate = safeDivide(g.severe, g.total);
-        const score = Math.round(nonWorkUnfastRate * 40 + fastNonHumanRate * 20 + overOneRate * 25 + severeRate * 15);
+        const workHumanRate = safeDivide(g.workHuman, g.workTotal);
+        const workFastNonHumanRate = safeDivide(g.workFastNonHuman, g.workTotal);
+        const workOverOneRate = safeDivide(g.workOverOne, g.workTotal);
+        const workSevereRate = safeDivide(g.workSevere, g.workTotal);
+        const score = Math.round(workFastNonHumanRate * 20 + workOverOneRate * 45 + workSevereRate * 35);
         const level = (
-          (nonWorkUnfastRate >= 0.6 && g.nonWork >= 5) ||
-          (overOneRate >= 0.4 && g.total >= 5) ||
-          g.severe >= 2 ||
-          (humanRate < 0.2 && g.total >= 5) ||
+          (workOverOneRate >= 0.4 && g.workTotal >= 5) ||
+          g.workSevere >= 2 ||
+          (workHumanRate < 0.2 && g.workTotal >= 5) ||
           score >= 60
         ) ? "高" : (
-          nonWorkUnfastRate >= 0.35 ||
-          overOneRate >= 0.2 ||
-          g.severe === 1 ||
-          humanRate < 0.35 ||
+          workOverOneRate >= 0.2 ||
+          g.workSevere === 1 ||
+          (workHumanRate < 0.35 && g.workTotal >= 5) ||
           score >= 35
         ) ? "中" : "低";
         return {
@@ -1967,7 +1966,8 @@
             g.owner, g.total, g.fast, fastRate, g.human, humanRate, g.nonWork,
             g.nonWorkUnfast, nonWorkUnfastRate, g.fastNonHuman, g.overOne, g.severe, score, level
           ],
-          level
+          level,
+          workTotal: g.workTotal
         };
       });
     }
@@ -1979,30 +1979,42 @@
         const fastRate = safeDivide(g.fast, g.total);
         const timelyRate = safeDivide(g.timely, g.total);
         const nonWorkUnfastRate = safeDivide(g.nonWorkUnfast, g.nonWork);
-        const overOneRate = safeDivide(g.overOne, g.total);
-        const overFastRate = safeDivide(g.overFast, g.total);
-        const severeRate = safeDivide(g.severe, g.total);
-        const score = Math.round(nonWorkUnfastRate * 35 + overFastRate * 25 + overOneRate * 15 + severeRate * 25);
+        const workFastRate = safeDivide(g.workFast, g.workTotal);
+        const workOverOneRate = safeDivide(g.workOverOne, g.workTotal);
+        const workOverFastRate = safeDivide(g.workOverFast, g.workTotal);
+        const workSevereRate = safeDivide(g.workSevere, g.workTotal);
+        const score = Math.round(workOverFastRate * 40 + workOverOneRate * 20 + workSevereRate * 40);
         const level = (
-          (nonWorkUnfastRate >= s.highNonWorkUnfastRate && g.nonWork >= 5) ||
-          (overFastRate >= s.highOverFastRate && g.total >= 5) ||
-          g.severe >= 2 ||
-          (fastRate < s.highFastRateFloor && g.total >= 5)
+          (workOverFastRate >= s.highOverFastRate && g.workTotal >= 5) ||
+          g.workSevere >= 2 ||
+          (workFastRate < s.highFastRateFloor && g.workTotal >= 5)
         ) ? "高" : (
-          nonWorkUnfastRate >= s.midNonWorkUnfastRate ||
-          overFastRate >= s.midOverFastRate ||
-          g.severe === 1 ||
-          fastRate < s.midFastRateFloor
+          workOverFastRate >= s.midOverFastRate ||
+          g.workSevere === 1 ||
+          (workFastRate < s.midFastRateFloor && g.workTotal >= 5)
         ) ? "中" : "低";
-        const action = level === "高" ? "优先抽查异常聊天，确认后降权或暂停询盘" : level === "中" ? "提醒观察，下周继续跟踪" : "正常接待";
+        const nonWorkNote = nonWorkMechanismHint(g);
+        const action = [
+          level === "高" ? "优先抽查异常聊天，确认后降权或暂停询盘" : level === "中" ? "提醒观察，下周继续跟踪" : "正常接待",
+          nonWorkNote
+        ].filter(Boolean).join("；");
         return {
           cells: [
             g.owner, g.total, g.fast, fastRate, g.timely, timelyRate, g.nonWork,
             g.nonWorkUnfast, nonWorkUnfastRate, g.overOne, g.overFast, g.severe, score, level, action
           ],
-          level
+          level,
+          workTotal: g.workTotal
         };
       });
+    }
+
+    function nonWorkMechanismHint(g) {
+      const rate = safeDivide(g.nonWorkUnfast, g.nonWork);
+      if (g.nonWork >= 5 && rate >= 0.5) return "非工作时间未及时承接，建议关注重点客户分流";
+      if (g.nonWork >= 5 && rate >= 0.35) return "非工作时间咨询较多，建议优化值班或自动回复机制";
+      if (g.nonWorkUnfast >= 3) return "非工作时间数据仅作机制观察，不计入个人时间风险分";
+      return "";
     }
 
     function groupByOwner(records) {
@@ -2012,7 +2024,9 @@
         if (!map.has(owner)) {
           map.set(owner, {
             owner, total: 0, fast: 0, human: 0, timely: 0, nonWork: 0,
-            nonWorkUnfast: 0, fastNonHuman: 0, overOne: 0, overFast: 0, severe: 0
+            nonWorkUnfast: 0, fastNonHuman: 0, overOne: 0, overFast: 0, severe: 0,
+            workTotal: 0, workFast: 0, workHuman: 0, workTimely: 0,
+            workFastNonHuman: 0, workOverOne: 0, workOverFast: 0, workSevere: 0
           });
         }
         const g = map.get(owner);
@@ -2026,6 +2040,16 @@
         g.overOne += r.overOne || 0;
         g.overFast += r.overFast || 0;
         g.severe += r.severe || 0;
+        if (r.nonWork !== 1) {
+          g.workTotal += 1;
+          g.workFast += r.fast || 0;
+          g.workHuman += r.human || 0;
+          g.workTimely += r.timely || 0;
+          g.workFastNonHuman += r.fastNonHuman || 0;
+          g.workOverOne += r.overOne || 0;
+          g.workOverFast += r.overFast || 0;
+          g.workSevere += r.severe || 0;
+        }
       });
       return Array.from(map.values());
     }
@@ -2981,19 +3005,29 @@
       platformData.summary.forEach(row => {
         const owner = row.cells[0];
         const key = canonicalOwner(owner);
-        const existing = map.get(key) || { owner: key, total: 0, scoreTotal: 0, level: "-" };
+        const existing = map.get(key) || { owner: key, total: 0, workTotal: 0, scoreTotal: 0, level: "-", nonWork: 0, nonWorkUnfast: 0 };
         const total = Number(row.cells[1]) || 0;
+        const workTotal = Number(row.workTotal) || 0;
+        const nonWork = Number(row.cells[6]) || 0;
+        const nonWorkUnfast = Number(row.cells[7]) || 0;
         const score = Number(row.cells[12]) || 0;
         existing.total += total;
-        existing.scoreTotal += score * total;
-        existing.score = existing.total ? existing.scoreTotal / existing.total : score;
+        existing.workTotal += workTotal;
+        existing.nonWork += nonWork;
+        existing.nonWorkUnfast += nonWorkUnfast;
+        existing.scoreTotal += score * workTotal;
+        existing.score = existing.workTotal ? existing.scoreTotal / existing.workTotal : 0;
         existing.level = row.cells[13] || existing.level;
         map.set(key, {
           owner: key,
           total: existing.total,
+          workTotal: existing.workTotal,
           scoreTotal: existing.scoreTotal,
           score: existing.score,
-          level: existing.level
+          level: existing.level,
+          nonWork: existing.nonWork,
+          nonWorkUnfast: existing.nonWorkUnfast,
+          nonWorkHint: nonWorkMechanismHint(existing)
         });
       });
       return map;
@@ -3010,15 +3044,18 @@
         const mic = micMap.get(key);
         const parts = [ali, mic].filter(Boolean);
         const totalConsult = parts.reduce((acc, item) => acc + item.total, 0);
-        const score = totalConsult
-          ? parts.reduce((acc, item) => acc + item.score * item.total, 0) / totalConsult
-          : parts.reduce((acc, item) => acc + item.score, 0) / Math.max(1, parts.length);
+        const totalWorkConsult = parts.reduce((acc, item) => acc + item.workTotal, 0);
+        const score = totalWorkConsult
+          ? parts.reduce((acc, item) => acc + item.score * item.workTotal, 0) / totalWorkConsult
+          : 0;
         result.set(key, {
           score: Math.round(score),
           level: judgeCompositeTimeRiskLevel(score),
           aliScore: ali ? Math.round(ali.score) : "-",
           micScore: mic ? Math.round(mic.score) : "-",
-          totalConsult
+          totalConsult,
+          totalWorkConsult,
+          nonWorkHint: [ali && ali.nonWorkHint, mic && mic.nonWorkHint].filter(Boolean).join("；")
         });
       });
       return result;
@@ -3124,6 +3161,7 @@
           ? clampScore(timeStandardScore * 0.40 + weightedHumanRiskScore * 0.60)
           : "-";
         const judged = judgeFinalRisk(g.reviewed, avg, g.serious, finalScore);
+        const finalHint = [judged.hint, time.nonWorkHint].filter(Boolean).join("；");
         return {
           owner: g.owner,
           reviewed: g.reviewed,
@@ -3133,12 +3171,12 @@
           exportCells: [
             g.owner, g.reviewed, importanceStructure(g), g.totalScore, roundOne(avg),
             roundOne(weightedHumanRiskScore), roundOne(timeStandardScore), roundOne(finalScore),
-            judged.level, judged.hint, issueRate, seriousRate, g.serious
+            judged.level, finalHint, issueRate, seriousRate, g.serious
           ],
           cells: [
             g.owner, g.reviewed, importanceStructure(g), roundOne(avg),
             roundOne(weightedHumanRiskScore), roundOne(timeStandardScore), roundOne(finalScore),
-            judged.level, judged.hint, issueRate, seriousRate, g.serious
+            judged.level, finalHint, issueRate, seriousRate, g.serious
           ]
         };
       });
