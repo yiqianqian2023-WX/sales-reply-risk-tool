@@ -187,6 +187,10 @@
       color: var(--ink);
     }
 
+    .hidden-file {
+      display: none;
+    }
+
     .actions {
       display: flex;
       flex-wrap: wrap;
@@ -868,6 +872,7 @@
           <input id="qualityFileInput" type="file" accept=".xls,.xlsx,.csv">
           <div class="actions">
             <button id="qualityClearBtn" disabled>清空结果</button>
+            <button id="qualityAiScoreImportBtn" type="button">导入 AI评分结果</button>
             <span id="qualityStatus" class="status">等待上传询盘中心报表</span>
           </div>
         </div>
@@ -978,6 +983,7 @@
           <strong>人工复核与最终评估</strong>
           <div class="subtitle">在“回复质量风险”里给商机打分后，这里会按业务员汇总复核样本、平均风险分、问题率和严重问题率。</div>
           <div class="actions">
+            <input id="aiScoreFileInput" class="hidden-file" type="file" accept=".xls,.xlsx,.csv">
             <span id="reviewStatus" class="status">等待回复质量复核数据</span>
           </div>
         </div>
@@ -1205,6 +1211,8 @@
     const reviewMetricsEl = document.getElementById("reviewMetrics");
     const reviewSummaryEl = document.getElementById("reviewSummaryTable");
     const reviewSummaryHint = document.getElementById("reviewSummaryHint");
+    const qualityAiScoreImportBtn = document.getElementById("qualityAiScoreImportBtn");
+    const aiScoreFileInput = document.getElementById("aiScoreFileInput");
     const micQualityFileInput = document.getElementById("micQualityFileInput");
     const micQualityClearBtn = document.getElementById("micQualityClearBtn");
     const micQualityStatusEl = document.getElementById("micQualityStatus");
@@ -1233,6 +1241,8 @@
       micQualityState.priorityFilter = micPriorityFilter.value;
       renderMicQualityDetails();
     });
+    qualityAiScoreImportBtn.addEventListener("click", () => aiScoreFileInput.click());
+    aiScoreFileInput.addEventListener("change", handleAiScoreFile);
     editRuleBtn.addEventListener("click", () => {
       ruleEditorOpen = true;
       renderPlatformChrome();
@@ -1589,6 +1599,34 @@
       return { headers, dataRows, headerIndex };
     }
 
+    function aiScoreHeaderMatch(row) {
+      const cells = row.map(cell => normalizeHeader(cell).toLowerCase()).filter(Boolean);
+      const hasScoreColumn = cells.some(cell => [
+        "单条风险分", "ai评分", "ai风险分", "人工评分", "风险分", "评分", "分数", "打分", "复核评分", "评分结果", "复核结果"
+      ].some(name => cell.includes(normalizeHeader(name).toLowerCase())));
+      if (!hasScoreColumn) return 0;
+      const identityColumns = ["评分回填key", "回填key", "scorekey", "平台", "业务员", "业务", "客户/商机", "客户名", "询盘单号", "询盘主题", "国家"];
+      const identityScore = identityColumns.reduce((acc, name) => {
+        const normalized = normalizeHeader(name).toLowerCase();
+        return acc + (cells.some(cell => cell.includes(normalized)) ? 1 : 0);
+      }, 0);
+      return 2 + identityScore;
+    }
+
+    function readRowsFromSheetName(workbook, sheetName) {
+      const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, defval: "", raw: false });
+      let best = { index: -1, score: 0 };
+      rows.forEach((row, index) => {
+        const score = aiScoreHeaderMatch(row);
+        if (score > best.score) best = { index, score };
+      });
+      const headerIndex = best.index;
+      if (headerIndex < 0) return null;
+      const headers = rows[headerIndex] || [];
+      const dataRows = rows.slice(headerIndex + 1).filter(row => row.some(cell => String(cell ?? "").trim() !== ""));
+      return { headers, dataRows, sheetName };
+    }
+
     function cleanText(value) {
       return String(value ?? "").replace(/\u00a0/g, " ").trim();
     }
@@ -1648,6 +1686,135 @@
       if (info.score === "" || info.score === undefined || info.score === null) return null;
       const num = Number(info.score);
       return Number.isFinite(num) ? num : null;
+    }
+
+    function scoreKeyForSave(row) {
+      return scoreKey(row);
+    }
+
+    function compactImportValue(value) {
+      return cleanText(value).toLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5]/g, "");
+    }
+
+    function inquiryImportKey(value) {
+      const key = compactImportValue(value);
+      return key ? `inquiry:${key}` : "";
+    }
+
+    function taskImportKeys(row) {
+      const platform = compactImportValue(row.platformLabel || scorePlatform(row));
+      const owner = compactImportValue(canonicalOwner(row.owner));
+      const task = compactImportValue(row.taskName || row.inquiryNo || row.customerName);
+      const customer = compactImportValue(row.customerName);
+      const country = compactImportValue(row.country);
+      const keys = [
+        inquiryImportKey(row.inquiryNo),
+        `key:${scoreKey(row)}`,
+        `key:${legacyScoreKey(row)}`,
+        `row:${platform}|${owner}|${task}`,
+        `row:${owner}|${task}`,
+        `row:${platform}|${owner}|${customer}|${country}`,
+        `row:${owner}|${customer}|${country}`
+      ];
+      return Array.from(new Set(keys.filter(key => !key.endsWith("||") && !key.includes("undefined"))));
+    }
+
+    function importRowKey(row) {
+      const platform = compactImportValue(row.platform);
+      const owner = compactImportValue(canonicalOwner(row.owner));
+      const task = compactImportValue(row.taskName);
+      const country = compactImportValue(row.country);
+      return `row:${platform}|${owner}|${task}${country ? `|${country}` : ""}`;
+    }
+
+    function parseImportedScore(scoreValue, labelValue) {
+      const text = `${cleanText(scoreValue)} ${cleanText(labelValue)}`.trim();
+      if (!text) return null;
+      const exact = cleanText(scoreValue);
+      if (/^[0-3]$/.test(exact)) return exact;
+      const numberMatch = text.match(/[0-3](?=\s*分?)|(?<!\d)[0-3](?!\d)/);
+      if (numberMatch) return numberMatch[0];
+      if (/合格|通过|正常|无问题|pass/i.test(text)) return "0";
+      if (/轻微|轻度|minor/i.test(text)) return "1";
+      if (/一般|中等|medium|moderate/i.test(text)) return "2";
+      if (/严重|重大|high|severe/i.test(text)) return "3";
+      return null;
+    }
+
+    function aiScoreSheetRows(workbook) {
+      const preferred = workbook.SheetNames.find(name => /复核结果明细|复核清单|ai|评分/i.test(name));
+      const orderedNames = preferred ? [preferred, ...workbook.SheetNames.filter(name => name !== preferred)] : workbook.SheetNames;
+      for (const sheetName of orderedNames) {
+        const result = readRowsFromSheetName(workbook, sheetName);
+        if (result) return result;
+      }
+      return null;
+    }
+
+    function cellByCandidates(headers, row, candidates) {
+      const index = indexByCandidates(headers, candidates, -1);
+      return index >= 0 ? row[index] : "";
+    }
+
+    function parseAiScoreRows(headers, dataRows) {
+      return dataRows.map(row => {
+        const key = cleanText(cellByCandidates(headers, row, ["评分回填Key", "回填Key", "scoreKey", "评分Key"]));
+        const platform = cleanText(cellByCandidates(headers, row, ["平台"]));
+        const owner = cleanText(cellByCandidates(headers, row, ["业务员", "业务"]));
+        const inquiryNo = cleanText(cellByCandidates(headers, row, ["询盘单号", "询盘号", "询盘编号", "询盘ID", "询盘id", "询盘单编号", "客户询盘单号", "商机单号", "商机编号", "商机ID", "商机id", "Inquiry No", "Inquiry ID", "RFQ No"]));
+        const taskName = inquiryNo || cleanText(cellByCandidates(headers, row, ["客户/商机", "客户名", "询盘主题", "客户"]));
+        const country = cleanText(cellByCandidates(headers, row, ["国家"]));
+        const label = cellByCandidates(headers, row, ["AI评分结果", "AI复核结果", "人工复核结果", "复核结果", "评分结果"]);
+        const score = parseImportedScore(cellByCandidates(headers, row, ["单条风险分", "AI评分", "AI风险分", "人工评分", "复核评分", "风险分", "评分", "分数", "打分"]), label);
+        const note = cleanText(cellByCandidates(headers, row, ["AI备注", "人工备注", "复核备注", "备注", "AI原因", "评分说明", "评分理由", "复核说明"])) || cleanText(label);
+        return { key, platform, owner, inquiryNo, taskName, country, score, note };
+      }).filter(row => row.key || row.inquiryNo || row.taskName || row.owner || row.score !== null);
+    }
+
+    function reviewTaskLookup() {
+      const map = new Map();
+      buildReviewTasks().forEach(row => {
+        const value = { row, saveKey: scoreKeyForSave(row) };
+        taskImportKeys(row).forEach(key => {
+          if (!map.has(key)) map.set(key, []);
+          map.get(key).push(value);
+        });
+      });
+      return map;
+    }
+
+    function matchImportedScore(row, lookup) {
+      const candidates = [];
+      if (row.key) {
+        candidates.push(`key:${row.key}`);
+      }
+      const inquiryKey = inquiryImportKey(row.inquiryNo || row.taskName);
+      if (inquiryKey) candidates.push(inquiryKey);
+      const exact = importRowKey(row);
+      candidates.push(exact);
+      if (exact.split("|").length === 4) {
+        candidates.push(exact.replace(/\|[^|]+$/, ""));
+      }
+      const owner = compactImportValue(canonicalOwner(row.owner));
+      const task = compactImportValue(row.taskName);
+      const country = compactImportValue(row.country);
+      const withoutPlatform = `row:${owner}|${task}${country ? `|${country}` : ""}`;
+      candidates.push(withoutPlatform);
+      if (withoutPlatform.split("|").length === 3) {
+        candidates.push(withoutPlatform.replace(/\|[^|]+$/, ""));
+      }
+      for (const key of candidates) {
+        const matches = lookup.get(key);
+        if (matches && matches.length === 1) return matches[0];
+      }
+      return null;
+    }
+
+    function setAiScoreImportStatus(text, isError = false) {
+      qualityStatusEl.textContent = text;
+      qualityStatusEl.style.color = isError ? "var(--danger)" : "var(--muted)";
+      reviewStatusEl.textContent = text;
+      reviewStatusEl.style.color = isError ? "var(--danger)" : "var(--muted)";
     }
 
     function hasIntentSignal(value) {
@@ -2536,6 +2703,59 @@
       } catch (error) {
         console.error(error);
         setMicQualityStatus(`读取失败：${error.message || error}`, true);
+      }
+    }
+
+    async function handleAiScoreFile(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      if (!window.XLSX) {
+        setAiScoreImportStatus("SheetJS 未加载，请确认浏览器可以访问 CDN 后重新打开本页。", true);
+        return;
+      }
+      if (!qualityState.current || !qualityState.current.records.length) {
+        setAiScoreImportStatus("请先在回复质量风险的阿里国际站里上传询盘中心报表，再导入 AI评分结果。", true);
+        aiScoreFileInput.value = "";
+        return;
+      }
+      try {
+        setAiScoreImportStatus(`正在回填：${file.name}`);
+        const buffer = await file.arrayBuffer();
+        const workbook = XLSX.read(buffer, { type: "array", cellDates: true, raw: false });
+        const sheetRows = aiScoreSheetRows(workbook);
+        if (!sheetRows) throw new Error("没有找到包含评分结果的明细表");
+        const rows = parseAiScoreRows(sheetRows.headers, sheetRows.dataRows);
+        const lookup = reviewTaskLookup();
+        let matched = 0;
+        let invalid = 0;
+        let skipped = 0;
+        rows.forEach(row => {
+          if (row.score === null) {
+            invalid += 1;
+            return;
+          }
+          const target = matchImportedScore(row, lookup);
+          if (!target) {
+            skipped += 1;
+            return;
+          }
+          const existing = qualityState.scores[target.saveKey] || { score: "", note: "" };
+          qualityState.scores[target.saveKey] = {
+            score: row.score,
+            note: row.note || existing.note || ""
+          };
+          matched += 1;
+        });
+        saveQualityScores();
+        renderQualityAll();
+        renderMicQualityAll();
+        renderReviewModule();
+        setAiScoreImportStatus(`AI评分已回填 ${matched} 条${skipped ? `，${skipped} 条未匹配` : ""}${invalid ? `，${invalid} 条无有效分数` : ""}`, matched === 0);
+      } catch (error) {
+        console.error(error);
+        setAiScoreImportStatus(`AI评分回填失败：${error.message || error}`, true);
+      } finally {
+        aiScoreFileInput.value = "";
       }
     }
 
@@ -3594,14 +3814,15 @@
             row.buyerLevel, row.highIntent, row.buyerFeatures, row.followStatus, row.reason,
             score === "" ? "" : `${qualityScoreLabel(score)} ${score}分`,
             score,
-            info.note || ""
+            info.note || "",
+            scoreKey(row)
           ];
         })
       ];
     }
 
     function qualityDetailExportHeaders() {
-      return ["序号", "优先级", "业务员", "询盘单号", "客户名", "国家", "客户等级", "高意向", "买家特征", "跟进状态", "复核原因", "人工复核结果", "单条风险分", "人工备注"];
+      return ["序号", "优先级", "业务员", "询盘单号", "客户名", "国家", "客户等级", "高意向", "买家特征", "跟进状态", "复核原因", "人工复核结果", "单条风险分", "人工备注", "评分回填Key"];
     }
 
     function qualityRawRowsForExport() {
@@ -3643,7 +3864,7 @@
     }
 
     function reviewPoolRowsForExport() {
-      const headers = ["平台", "优先级", "业务员", "客户/商机", "国家", "复核原因", "客户原始需求", "业务员回复内容", "人工复核结果", "单条风险分", "人工备注"];
+      const headers = ["平台", "优先级", "业务员", "客户/商机", "国家", "复核原因", "客户原始需求", "业务员回复内容", "人工复核结果", "单条风险分", "人工备注", "评分回填Key"];
       return [
         headers,
         ...buildReviewTasks().map(row => {
@@ -3654,7 +3875,8 @@
             row.country || "-", row.reason || "-", row.displayNeed || "", row.displayReply || "",
             score === "" ? "" : `${qualityScoreLabel(score)} ${score}分`,
             score,
-            info.note || ""
+            info.note || "",
+            scoreKey(row)
           ];
         })
       ];
